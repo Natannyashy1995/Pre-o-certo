@@ -4434,6 +4434,7 @@ function renderAdminForm(){
         <div style="flex:1;background:var(--card2);border-radius:12px;padding:12px;text-align:center;"><div style="font-family:var(--font-title);font-size:22px;font-weight:800;color:var(--verde);">${aprovadas.length}</div><div style="font-size:11px;color:var(--muted);">Aprovadas</div></div>
         <div style="flex:1;background:var(--card2);border-radius:12px;padding:12px;text-align:center;"><div style="font-family:var(--font-title);font-size:22px;font-weight:800;color:var(--vermelho);">${db.contribuicoes.filter(c=>c.status==='recusado').length}</div><div style="font-size:11px;color:var(--muted);">Recusadas</div></div>
       </div>
+      ${db.contribuicoes.length > 0 ? '<button onclick="limparHistContribuicoes()" style="background:transparent;border:1.5px solid var(--vermelho);color:var(--vermelho);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">🗑️ Limpar histórico de contribuições processadas</button>' : ''}
       ${pendentes.length===0?`<div style="text-align:center;padding:40px 0;color:var(--muted);"><div style="font-size:40px;margin-bottom:10px;">✅</div><div>Nenhuma contribuição pendente</div></div>`:''}
       ${pendentes.map(c=>{
         const cProdId = String(c.produtoId?._id || c.produtoId || '');
@@ -5040,7 +5041,10 @@ function renderAdminForm(){
 
   }else if(tabAtiva==='solicitacoes'){
     form.innerHTML=`
-      <div style="font-size:13px;color:var(--muted);">Mercados que solicitaram cadastro.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;color:var(--muted);">Mercados que solicitaram cadastro.</div>
+        ${db.solicitacoes.length > 0 ? '<button onclick="limparHistSolicitacoes()" style="background:transparent;border:1.5px solid var(--vermelho);color:var(--vermelho);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Limpar processadas</button>' : ''}
+      </div>
       ${db.solicitacoes.length===0?`<div style="text-align:center;padding:40px 0;color:var(--muted);"><div style="font-size:40px;margin-bottom:10px;">📭</div><div>Nenhuma solicitação ainda</div></div>`:db.solicitacoes.map(s=>`
         <div style="background:var(--card2);border-radius:13px;padding:14px;border:1px solid var(--borda);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -6379,6 +6383,29 @@ async function recusarSolic(id){
     await apiReq('PATCH',`/api/admin/solicitacoes/${id}/recusar`,{motivo});
     await carregarDadosAdmin();
     showToast('Solicitação recusada','✅');
+    renderAdminForm();
+  } catch(e){ showToast('Erro: '+e.message,'❌'); }
+}
+
+// ─── LIMPAR HISTÓRICOS (admin) ───────────────────────────────
+async function limparHistContribuicoes(){
+  if(!confirm('Limpar todas as contribuições já processadas (aprovadas e recusadas) do banco?\n\nAs pendentes serão mantidas.')) return;
+  showToast('Limpando contribuições processadas...','⏳');
+  try {
+    await apiReq('DELETE','/api/admin/contribuicoes-processadas');
+    db.contribuicoes = db.contribuicoes.filter(c=>c.status==='pendente');
+    showToast('Histórico de contribuições limpo! ✅','🗑️');
+    renderAdminForm();
+  } catch(e){ showToast('Erro: '+e.message,'❌'); }
+}
+
+async function limparHistSolicitacoes(){
+  if(!confirm('Limpar todas as solicitações já processadas (aprovadas e recusadas) do banco?\n\nAs pendentes serão mantidas.')) return;
+  showToast('Limpando solicitações processadas...','⏳');
+  try {
+    await apiReq('DELETE','/api/admin/solicitacoes-processadas');
+    db.solicitacoes = db.solicitacoes.filter(s=>s.status==='Pendente');
+    showToast('Histórico de solicitações limpo! ✅','🗑️');
     renderAdminForm();
   } catch(e){ showToast('Erro: '+e.message,'❌'); }
 }

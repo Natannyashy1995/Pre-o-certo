@@ -1125,6 +1125,21 @@ app.post('/api/produtos', adminAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
+// Atualizar produto (emoji, categoria, nome)
+app.put('/api/admin/produtos/:id', adminAuth, async (req, res) => {
+  try {
+    const { nome, emoji, categoria, ativo } = req.body;
+    const upd = {};
+    if (nome) upd.nome = nome;
+    if (emoji) upd.emoji = emoji;
+    if (categoria) upd.categoria = categoria;
+    if (ativo !== undefined) upd.ativo = ativo;
+    const p = await Produto.findByIdAndUpdate(req.params.id, upd, { new: true });
+    if (!p) return res.status(404).json({ erro: 'Produto não encontrado' });
+    res.json(p);
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 // ── SOLICITAÇÃO DE NOVO PRODUTO (cliente via IA) ──────────
 // Cliente solicita cadastro de produto detectado pela IA que não existe no catálogo
 app.post('/api/produtos/solicitar', authMiddleware, async (req, res) => {
@@ -2042,8 +2057,23 @@ app.post('/api/admin/limpar-duplicatas', adminAuth, async (req, res) => {
 });
 
 // ── SPA FALLBACK ─────────────────────────────────────────
+// Qualquer rota /api/* não encontrada retorna 404 JSON (não HTML)
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ erro: 'Rota não encontrada: ' + req.method + ' ' + req.path });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Error handler global — garante que erros em rotas /api retornem JSON
+app.use((err, req, res, next) => {
+  console.error('[Erro]', err.message);
+  if (req.path.startsWith('/api')) {
+    res.status(500).json({ erro: err.message || 'Erro interno do servidor' });
+  } else {
+    res.status(500).sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
 });
 
 // ═══════════════════════════════════════════════════════════

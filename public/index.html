@@ -22,9 +22,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <!-- SEO / Social -->
-<meta name="description" content="Compare preços de supermercados em Piatã, Bahia. Economize nas suas compras!">
-<meta property="og:title" content="PreçoCerto — Piatã BA">
-<meta property="og:description" content="Comparador de preços de supermercados em Piatã, Bahia">
+<meta name="description" content="Compare preços de supermercados na sua cidade. Economize nas suas compras!">
+<meta property="og:title" content="PreçoCerto — Compare preços e economize">
+<meta property="og:description" content="Comparador de preços de supermercados da sua cidade">
 <meta property="og:type" content="website">
 <meta name="robots" content="index, follow">
 
@@ -32,7 +32,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="shortcut icon" href="/icons/icon-96.png">
 
-<title>PreçoCerto — Piatã BA</title>
+<title>PreçoCerto</title>
 
 <!-- Fonte carregada de forma não-bloqueante para iOS -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -493,7 +493,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--texto);min-he
 <div id="splashScreen" style="position:fixed;inset:0;z-index:999999;background:linear-gradient(145deg,#0B4F8A 0%,#1A73C8 50%,#2E9EE8 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s ease;">
   <div style="font-size:64px;margin-bottom:16px;animation:pulse 2s ease-in-out infinite;">🔍</div>
   <div style="font-family:'Nunito',sans-serif;font-size:28px;font-weight:900;color:#fff;letter-spacing:.5px;">PreçoCerto</div>
-  <div style="font-family:'Open Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;">Piatã • Bahia</div>
+  <div style="font-family:'Open Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;">Compare preços e economize</div>
   <div style="margin-top:30px;display:flex;flex-direction:column;align-items:center;gap:10px;">
     <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
     <div id="splashStatus" style="font-family:'Open Sans',sans-serif;font-size:12px;color:rgba(255,255,255,.6);">Conectando ao servidor...</div>
@@ -580,7 +580,7 @@ setTimeout(()=>{splashMsg('Se demorar muito, verifique sua conexão.');hideSplas
       <div class="lb-icon">🔍</div>
       <div>
         <div class="lb-nome">PreçoCerto</div>
-        <div class="lb-sub">Piatã, Bahia</div>
+        <div class="lb-sub">Comparador de preços</div>
       </div>
     </div>
 
@@ -772,7 +772,7 @@ setTimeout(()=>{splashMsg('Se demorar muito, verifique sua conexão.');hideSplas
   <div class="home-hero">
     <div class="hero-tag" id="heroLocTag">📍 Piatã, BA</div>
     <h1 class="hero-title">Pague menos<br>no <span class="destaque">mercado</span><br>toda vez.</h1>
-    <p class="hero-subtitle">Compare preços em Piatã. Informações atualizadas pela comunidade.</p>
+    <p class="hero-subtitle">Compare preços na sua cidade. Informações atualizadas pela comunidade.</p>
     <div class="hero-stats">
       <div class="stat"><span class="stat-num" id="totalProdutos">0</span><span class="stat-label">Produtos</span></div>
       <div class="stat"><span class="stat-num" id="totalMercados">0</span><span class="stat-label">Mercados</span></div>
@@ -2552,7 +2552,7 @@ const botRespostas = [
 
   // COMO FUNCIONA
   [['como funciona','o que e','o que é','para que serve','como usar','tutorial','explicar','explica'],
-   'O PreçoCerto é um comparador de preços comunitário de Piatã! 🏷️\n\n1️⃣ A comunidade fotografa preços nos mercados\n2️⃣ A IA lê e cadastra automaticamente\n3️⃣ Você compara e economiza!\n\nGratuito para todos! 💚'],
+   'O PreçoCerto é um comparador de preços comunitário! 🏷️\n\n1️⃣ A comunidade fotografa preços nos mercados\n2️⃣ A IA lê e cadastra automaticamente\n3️⃣ Você compara e economiza!\n\nGratuito para todos! 💚'],
 
   // ERRO / BUG / PROBLEMA TÉCNICO
   [['erro','bug','travou','travando','nao abre','não abre','nao funciona','não funciona','falha','problema','nao carrega'],
@@ -4304,10 +4304,14 @@ function renderAdminForm(){
             <div style="font-size:11px;color:var(--muted);">${dups.map(p=>p.nome).join(', ')}</div>
           </div>
           <button onclick="limparDuplicados()" style="background:#DC2626;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧹 Limpar</button>
-        <button onclick="corrigirEmojiCategoriaDb()" style="background:#8B5CF6;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Corrigir Emoji/Cat</button>
-        <button onclick="limparPrecosOrfaos()" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Limpar Preços Órfãos</button>
         </div>` : '';
       })()}
+
+      <!-- FERRAMENTAS DE MANUTENÇÃO (sempre visíveis) -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="corrigirEmojiCategoriaDb()" style="background:#8B5CF6;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Corrigir Emoji/Cat</button>
+        <button onclick="limparPrecosOrfaos()" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Limpar Preços Órfãos</button>
+      </div>
 
       <!-- MERCADOS CADASTRADOS -->
       <div style="font-family:var(--font-title);font-size:15px;font-weight:700;margin-top:4px;">🏪 Mercados Cadastrados</div>

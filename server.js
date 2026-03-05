@@ -1792,7 +1792,7 @@ app.patch('/api/admin/solicitacoes/:id/aprovar', adminAuth, async (req, res) => 
     });
 
     // Montar mensagem WhatsApp com credenciais
-    const msgWa = `✅ *PreçoCerto Piatã* — Cadastro Aprovado!\n\n` +
+    const msgWa = `✅ *PreçoCerto* — Cadastro Aprovado!\n\n` +
       `🏪 *Mercado:* ${sol.mercado}\n` +
       `👤 *Login:* ${loginFinal}\n` +
       `🔑 *Senha:* ${senhaFinal}\n\n` +

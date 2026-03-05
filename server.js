@@ -1258,18 +1258,63 @@ app.delete('/api/precos/:produtoId/:mercadoId', adminAuth, async (req, res) => {
         !mercadoId || mercadoId === 'null' || mercadoId === 'undefined') {
       return res.status(400).json({ erro:'IDs inválidos' });
     }
-    // Tenta deletar — se o ObjectId não for válido, Mongoose lança erro que capturamos
-    const resultado = await Preco.findOneAndDelete({ produtoId, mercadoId });
-    if (!resultado) {
-      // Tenta com ObjectId explícito
-      if (isObjId(produtoId) && isObjId(mercadoId)) {
-        await Preco.findOneAndDelete({
-          produtoId: new mongoose.Types.ObjectId(produtoId),
-          mercadoId: new mongoose.Types.ObjectId(mercadoId)
-        });
-      }
+    let deletado = false;
+    // Tenta como string primeiro
+    const r1 = await Preco.findOneAndDelete({ produtoId, mercadoId });
+    if (r1) deletado = true;
+    // Tenta com ObjectId explícito se não encontrou
+    if (!deletado && isObjId(produtoId) && isObjId(mercadoId)) {
+      const r2 = await Preco.findOneAndDelete({
+        produtoId: new mongoose.Types.ObjectId(produtoId),
+        mercadoId: new mongoose.Types.ObjectId(mercadoId)
+      });
+      if (r2) deletado = true;
     }
-    res.json({ ok: true });
+    // Tenta busca mais ampla (produtoId pode estar armazenado como string ou ObjectId)
+    if (!deletado) {
+      const r3 = await Preco.deleteMany({
+        $or: [
+          { produtoId: produtoId, mercadoId: mercadoId },
+          ...(isObjId(produtoId) && isObjId(mercadoId) ? [
+            { produtoId: new mongoose.Types.ObjectId(produtoId), mercadoId: new mongoose.Types.ObjectId(mercadoId) }
+          ] : [])
+        ]
+      });
+      if (r3.deletedCount) deletado = true;
+    }
+    res.json({ ok: true, deletado });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Limpar preço órfão (quando produto foi deletado mas preço persiste)
+app.post('/api/admin/limpar-preco-orfao', adminAuth, async (req, res) => {
+  try {
+    const { produtoId, mercadoId } = req.body;
+    if (!produtoId || !mercadoId) return res.status(400).json({ erro:'produtoId e mercadoId obrigatórios' });
+    // Deleta usando todas as formas possíveis
+    const r = await Preco.deleteMany({
+      $or: [
+        { produtoId: produtoId, mercadoId: mercadoId },
+        ...(isObjId(produtoId) ? [{ produtoId: new mongoose.Types.ObjectId(produtoId), mercadoId: mercadoId }] : []),
+        ...(isObjId(mercadoId) ? [{ produtoId: produtoId, mercadoId: new mongoose.Types.ObjectId(mercadoId) }] : []),
+        ...(isObjId(produtoId) && isObjId(mercadoId) ? [{ produtoId: new mongoose.Types.ObjectId(produtoId), mercadoId: new mongoose.Types.ObjectId(mercadoId) }] : [])
+      ]
+    });
+    res.json({ ok: true, removidos: r.deletedCount });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Limpar TODOS os preços órfãos (produto não existe mais no catálogo)
+app.post('/api/admin/limpar-precos-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find();
+    const produtosIds = new Set((await Produto.find({}, '_id')).map(p => String(p._id)));
+    const orfaos = todosPrecos.filter(p => !produtosIds.has(String(p.produtoId)));
+    if (orfaos.length) {
+      await Preco.deleteMany({ _id: { $in: orfaos.map(p => p._id) } });
+    }
+    await registrarLog('admin', `Limpeza: ${orfaos.length} preço(s) órfão(s) removidos`, req.user.usuario, getIP(req));
+    res.json({ ok: true, removidos: orfaos.length });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 

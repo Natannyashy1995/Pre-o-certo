@@ -4259,6 +4259,7 @@ function renderAdminForm(){
           </div>
           <button onclick="limparDuplicados()" style="background:#DC2626;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧹 Limpar</button>
         <button onclick="corrigirEmojiCategoriaDb()" style="background:#8B5CF6;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Corrigir Emoji/Cat</button>
+        <button onclick="limparPrecosOrfaos()" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Limpar Preços Órfãos</button>
         </div>` : '';
       })()}
 
@@ -7104,20 +7105,36 @@ function executarBuscaAuto(){
 // ─── EXCLUIR PREÇO (admin) ───────────────────────────────────────────────────
 async function excluirPreco(produtoId, mercadoId){
   if(!confirm('Excluir este preço?')) return;
-  // Garante que temos IDs string válidos (24 hex chars para MongoDB ObjectId)
   const pId = String(produtoId||'').trim();
   const mId = String(mercadoId||'').trim();
-  if(!pId || pId.length < 10 || pId === 'null' || pId === 'undefined'){
-    // Produto inválido — remove apenas localmente
-    db.precos = db.precos.filter(p=>!(String(p.produtoId)===pId && String(p.mercadoId||p.mercadoId?._id)===mId));
-    showToast('Preço órfão removido localmente','🗑️');
-    renderAdminForm();
-    return;
-  }
+  // Remove localmente primeiro
+  db.precos = db.precos.filter(p=>!(String(p.produtoId)===pId && String(p.mercadoId)===mId));
+  // Tenta deletar no servidor também (mesmo se o ID parecer inválido)
   try {
-    await apiReq('DELETE','/api/precos/'+pId+'/'+mId);
-    db.precos = db.precos.filter(p=>!(String(p.produtoId)===pId&&String(p.mercadoId)===mId));
-    showToast('Preço excluído! ✅','🗑️');
+    await apiReq('DELETE','/api/precos/'+encodeURIComponent(pId)+'/'+encodeURIComponent(mId));
+    showToast('Preço excluído do banco! ✅','🗑️');
+  } catch(e){
+    // Se falhou no servidor, tenta a rota de limpeza por IDs exatos
+    try {
+      await apiReq('POST','/api/admin/limpar-preco-orfao',{produtoId:pId,mercadoId:mId});
+      showToast('Preço órfão removido do banco! ✅','🗑️');
+    } catch(e2){
+      showToast('Removido localmente. Erro no banco: '+e.message,'⚠️');
+    }
+  }
+  renderAdminForm();
+}
+
+// ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
+async function limparPrecosOrfaos(){
+  if(!confirm('Remover todos os preços de produtos que não existem mais no catálogo?\n\nIsso apaga do banco permanentemente.')) return;
+  showToast('Limpando preços órfãos...','⏳');
+  try {
+    const res = await apiReq('POST','/api/admin/limpar-precos-orfaos',{});
+    // Atualiza local
+    const prodIds = new Set(db.produtos.map(p=>String(p._id||p.id)));
+    db.precos = db.precos.filter(p=>prodIds.has(String(p.produtoId)));
+    showToast(`${res.removidos||0} preço(s) órfão(s) removidos do banco! ✅`,'🗑️');
     renderAdminForm();
   } catch(e){ showToast('Erro: '+e.message,'❌'); }
 }

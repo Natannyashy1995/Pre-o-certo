@@ -489,6 +489,33 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--texto);min-he
 </head>
 <body>
 
+<!-- SPLASH SCREEN (aparece enquanto o servidor acorda) -->
+<div id="splashScreen" style="position:fixed;inset:0;z-index:999999;background:linear-gradient(145deg,#0B4F8A 0%,#1A73C8 50%,#2E9EE8 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s ease;">
+  <div style="font-size:64px;margin-bottom:16px;animation:pulse 2s ease-in-out infinite;">🔍</div>
+  <div style="font-family:'Nunito',sans-serif;font-size:28px;font-weight:900;color:#fff;letter-spacing:.5px;">PreçoCerto</div>
+  <div style="font-family:'Open Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;">Piatã • Bahia</div>
+  <div style="margin-top:30px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+    <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
+    <div id="splashStatus" style="font-family:'Open Sans',sans-serif;font-size:12px;color:rgba(255,255,255,.6);">Conectando ao servidor...</div>
+  </div>
+</div>
+<script>
+// Esconde a splash screen quando o app carrega
+function hideSplash(){
+  const s=document.getElementById('splashScreen');
+  if(s){s.style.opacity='0';setTimeout(()=>s.remove(),500);}
+}
+// Atualiza status da splash
+function splashMsg(msg){
+  const el=document.getElementById('splashStatus');
+  if(el)el.textContent=msg;
+}
+// Timeout: se demorar mais de 45s, mostra dica
+setTimeout(()=>{splashMsg('Servidor acordando... aguarde mais alguns segundos');},8000);
+setTimeout(()=>{splashMsg('Quase lá! O primeiro acesso pode demorar até 1 minuto.');},20000);
+setTimeout(()=>{splashMsg('Se demorar muito, verifique sua conexão.');hideSplash();},60000);
+</script>
+
 <!-- TOAST -->
 <div class="toast" id="toast">
   <span class="toast-icon" id="toastIcon">✅</span>
@@ -1091,6 +1118,18 @@ async function apiReq(method, path, body=null, auth=true){
     const opts = { method, headers };
     if(body) opts.body = JSON.stringify(body);
     const res = await fetch(API_URL + path, opts);
+    // Verifica se a resposta é JSON antes de parsear
+    const contentType = res.headers.get('content-type') || '';
+    if(!contentType.includes('application/json')){
+      // Servidor retornou HTML (SPA fallback) — rota não existe
+      if(!res.ok) throw new Error('Rota não encontrada no servidor');
+      // Pode ser redirect ou página HTML
+      const text = await res.text();
+      if(text.startsWith('<!') || text.startsWith('<html')){
+        throw new Error('Servidor retornou HTML em vez de JSON — verifique a rota');
+      }
+      try { return JSON.parse(text); } catch(e) { throw new Error('Resposta inválida do servidor'); }
+    }
     const data = await res.json();
     if(!res.ok) throw new Error(data.erro || 'Erro na API');
     modoOffline = false;
@@ -1192,6 +1231,7 @@ async function chamarIA(prompt, imageBase64=null, mediaType='image/jpeg'){
 
 async function carregarDadosBackend(){
   try {
+    if(typeof splashMsg==='function') splashMsg('Carregando dados do servidor...');
     showToast('Sincronizando dados...','🔄');
 
     // Carrega tudo em paralelo
@@ -7109,20 +7149,22 @@ async function excluirPreco(produtoId, mercadoId){
   const mId = String(mercadoId||'').trim();
   // Remove localmente primeiro
   db.precos = db.precos.filter(p=>!(String(p.produtoId)===pId && String(p.mercadoId)===mId));
-  // Tenta deletar no servidor também (mesmo se o ID parecer inválido)
+  renderAdminForm();
+  // Tenta deletar no servidor
+  let deletadoNoBanco = false;
+  // Método 1: rota DELETE padrão
   try {
-    await apiReq('DELETE','/api/precos/'+encodeURIComponent(pId)+'/'+encodeURIComponent(mId));
-    showToast('Preço excluído do banco! ✅','🗑️');
-  } catch(e){
-    // Se falhou no servidor, tenta a rota de limpeza por IDs exatos
+    await apiReq('DELETE','/api/precos/'+pId+'/'+mId);
+    deletadoNoBanco = true;
+  } catch(e1){ console.warn('DELETE precos falhou:', e1.message); }
+  // Método 2: rota POST de limpeza individual
+  if(!deletadoNoBanco){
     try {
       await apiReq('POST','/api/admin/limpar-preco-orfao',{produtoId:pId,mercadoId:mId});
-      showToast('Preço órfão removido do banco! ✅','🗑️');
-    } catch(e2){
-      showToast('Removido localmente. Erro no banco: '+e.message,'⚠️');
-    }
+      deletadoNoBanco = true;
+    } catch(e2){ console.warn('Limpar orfao falhou:', e2.message); }
   }
-  renderAdminForm();
+  showToast(deletadoNoBanco ? 'Preço excluído do banco! ✅' : 'Removido localmente (sincronize depois)', deletadoNoBanco ? '🗑️' : '⚠️');
 }
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
@@ -7307,6 +7349,8 @@ async function inicializarApp(){
   }
 
   renderHome();
+  // Esconde a splash screen
+  hideSplash();
 }
 
 // Inicia o app

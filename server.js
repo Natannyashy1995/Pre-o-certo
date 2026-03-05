@@ -1830,6 +1830,23 @@ app.patch('/api/admin/solicitacoes/:id/recusar', adminAuth, async (req, res) => 
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
+// ── LIMPAR HISTÓRICOS ────────────────────────────────────
+app.delete('/api/admin/contribuicoes-processadas', adminAuth, async (req, res) => {
+  try {
+    const r = await Contribuicao.deleteMany({ status: { $in: ['aprovado', 'rejeitado'] } });
+    await registrarLog('admin', `Contribuições processadas limpas: ${r.deletedCount}`, req.user.usuario, getIP(req));
+    res.json({ ok: true, removidos: r.deletedCount });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.delete('/api/admin/solicitacoes-processadas', adminAuth, async (req, res) => {
+  try {
+    const r = await Solicitacao.deleteMany({ status: { $in: ['Aprovado', 'Recusado'] } });
+    await registrarLog('admin', `Solicitações processadas limpas: ${r.deletedCount}`, req.user.usuario, getIP(req));
+    res.json({ ok: true, removidos: r.deletedCount });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 // ── OCORRÊNCIAS ──────────────────────────────────────────
 app.get('/api/ocorrencias', adminAuth, async (req, res) => {
   try { res.json(await Ocorrencia.find().sort({ createdAt:-1 })); }

@@ -1261,11 +1261,17 @@ async function carregarDadosBackend(){
 
     // Atualiza produtos — substitui lista local pelos do banco
     if(produtos && produtos.length > 0){
-      db.produtos = produtos.map(p=>({
-        ...p,
-        id: p._id,
-        _id: p._id
-      }));
+      db.produtos = produtos.map(p=>{
+        let emoji = p.emoji;
+        let categoria = p.categoria;
+        // Auto-corrige produtos com emoji padrão (📦) ou categoria genérica
+        if(!emoji || emoji === '📦' || !categoria || categoria === 'Geral'){
+          const auto = _inferirEmojiCat(p.nome);
+          if(!emoji || emoji === '📦') emoji = auto.emoji;
+          if(!categoria || categoria === 'Geral') categoria = auto.categoria;
+        }
+        return { ...p, id: p._id, _id: p._id, emoji, categoria };
+      });
       console.log('✅ Produtos carregados:', db.produtos.length);
     } else {
       console.warn('⚠️ Nenhum produto no banco ainda — usando locais');
@@ -7150,21 +7156,20 @@ async function excluirPreco(produtoId, mercadoId){
   // Remove localmente primeiro
   db.precos = db.precos.filter(p=>!(String(p.produtoId)===pId && String(p.mercadoId)===mId));
   renderAdminForm();
-  // Tenta deletar no servidor
-  let deletadoNoBanco = false;
-  // Método 1: rota DELETE padrão
+  // Deleta no banco via POST (mais confiável que DELETE com IDs na URL)
   try {
-    await apiReq('DELETE','/api/precos/'+pId+'/'+mId);
-    deletadoNoBanco = true;
-  } catch(e1){ console.warn('DELETE precos falhou:', e1.message); }
-  // Método 2: rota POST de limpeza individual
-  if(!deletadoNoBanco){
+    await apiReq('POST','/api/admin/limpar-preco-orfao',{produtoId:pId,mercadoId:mId});
+    showToast('Preço excluído do banco! ✅','🗑️');
+  } catch(e){
+    // Fallback: tenta DELETE clássico
     try {
-      await apiReq('POST','/api/admin/limpar-preco-orfao',{produtoId:pId,mercadoId:mId});
-      deletadoNoBanco = true;
-    } catch(e2){ console.warn('Limpar orfao falhou:', e2.message); }
+      await apiReq('DELETE','/api/precos/'+pId+'/'+mId);
+      showToast('Preço excluído! ✅','🗑️');
+    } catch(e2){
+      console.warn('Exclusão falhou:', e.message, e2.message);
+      showToast('Removido da tela. Use "Limpar Preços Órfãos" para limpar o banco.','⚠️');
+    }
   }
-  showToast(deletadoNoBanco ? 'Preço excluído do banco! ✅' : 'Removido localmente (sincronize depois)', deletadoNoBanco ? '🗑️' : '⚠️');
 }
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────

@@ -4804,15 +4804,10 @@ async function solicitarArquivoItem(btn) {
       fonte: 'admin'
     });
 
-    // Atualiza db.precos local
-    db.precos.push({
-      produtoId,
-      mercadoId: mercId,
-      preco: Number(preco),
-      dataAtu: hoje(),
-      fonte: 'admin',
-      autor: 'Admin'
-    });
+    // Atualiza db.precos local (upsert — evita duplicata)
+    const _piNew = db.precos.findIndex(p=>String(p.produtoId)===produtoId&&String(p.mercadoId)===mercId);
+    const _entryNew = { produtoId, mercadoId: mercId, preco: Number(preco), dataAtu: hoje(), fonte: 'admin', autor: 'Admin' };
+    if(_piNew>=0) db.precos[_piNew]=_entryNew; else db.precos.push(_entryNew);
 
     btn.textContent = '✅ Cadastrado';
     btn.style.background = '#16A34A';
@@ -6781,15 +6776,14 @@ function renderAdminForm(){
         <div style="font-size:12px;color:#5B21B6;font-weight:800;margin-bottom:12px;">✨ Ativar novo impulsionamento (24h)</div>
 
         <div class="field-label">Mercado</div>
-        <select class="input-field" id="impMercSelect">
+        <select class="input-field" id="impMercSelect" onchange="atualizarProdutosImpulsionamento()">
           <option value="">Selecione o mercado...</option>
           ${mercsLista.map(m=>`<option value="${m._id||m.id}">${m.nome}</option>`).join('')}
         </select>
 
         <div class="field-label" style="margin-top:10px;">Produto</div>
         <select class="input-field" id="impProdSelect">
-          <option value="">Selecione o produto...</option>
-          ${prodsLista.map(p=>`<option value="${p._id||p.id}">${p.emoji} ${p.nome}</option>`).join('')}
+          <option value="">— selecione o mercado primeiro —</option>
         </select>
 
         <div style="display:flex;gap:8px;margin-top:10px;">
@@ -6839,6 +6833,33 @@ function renderAdminForm(){
   }
 } // fecha renderAdminForm
 // ===== IMPULSIONAMENTO ADMIN =====
+function atualizarProdutosImpulsionamento(){
+  const mercId = document.getElementById('impMercSelect')?.value;
+  const sel = document.getElementById('impProdSelect');
+  if(!sel) return;
+  if(!mercId){
+    sel.innerHTML = '<option value="">— selecione o mercado primeiro —</option>';
+    return;
+  }
+  // Busca produtos que têm preço cadastrado para este mercado
+  const prodIds = [...new Set(
+    db.precos
+      .filter(p=>String(p.mercadoId)===String(mercId))
+      .map(p=>String(p.produtoId))
+  )];
+  const prods = db.produtos.filter(p=>prodIds.includes(String(p._id||p.id)));
+  if(!prods.length){
+    sel.innerHTML = '<option value="">Nenhum produto cadastrado para este mercado</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Selecione o produto...</option>' +
+    prods.map(p=>{
+      const preco = db.precos.find(pr=>String(pr.produtoId)===String(p._id||p.id)&&String(pr.mercadoId)===String(mercId));
+      const precoTxt = preco ? ` — R$ ${fmt(preco.preco)}` : '';
+      return `<option value="${p._id||p.id}">${p.emoji} ${p.nome}${precoTxt}</option>`;
+    }).join('');
+}
+
 function ativarImpulsionamento(){
   const mercId = document.getElementById('impMercSelect')?.value;
   const prodId = document.getElementById('impProdSelect')?.value;

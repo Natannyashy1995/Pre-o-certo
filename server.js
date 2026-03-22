@@ -438,6 +438,20 @@ const iaLimiter      = rateLimit({ windowMs: 60*1000, max: 20,
 const iaAdminLimiter = rateLimit({ windowMs: 60*1000, max: 300,
   message: { erro: 'Limite admin IA atingido.' }
 });
+// ── DIGITAL ASSET LINKS (Play Store TWA — remove barra do navegador) ────────
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json([{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.precocerto.piata",
+      "sha256_cert_fingerprints": ["3D:F8:D6:3F:4D:43:B2:42:5F:E6:49:15:2C:7A:EC:24:64:2C:F3:C7:6E:C3:26:B0:33:36:05:EE:A3:D7:69:3F"]
+    }
+  }]);
+});
+
 app.use('/api', limiter);
 
 // ═══════════════════════════════════════════════════════════

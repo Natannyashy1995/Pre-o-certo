@@ -11432,6 +11432,11 @@ function urlBase64ToUint8Array(b64){
 
 // Handler de mensagens do service worker
 if('serviceWorker' in navigator){
+  // Registra o service worker (push + cache + tela manutenção)
+  navigator.serviceWorker.register('/service-worker.js')
+    .then(reg => console.log('[SW] Registrado:', reg.scope))
+    .catch(err => console.warn('[SW] Falha:', err));
+
   navigator.serviceWorker.addEventListener('message', e => {
     if(e.data?.type === 'PUSH_RECEIVED')
       showToast(e.data.titulo || 'Nova notificação 🔔', '🔔');

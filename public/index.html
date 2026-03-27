@@ -10925,6 +10925,7 @@ async function excluirPreco(produtoId, mercadoId){
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
 async function autoRenomearRecuperados(){
+  if(!apiToken){showToast('Faça login novamente no admin','❌');return;}
   if(!confirm('Tentar renomear automaticamente?\nO sistema cruza os precos com o historico da IA e notas fiscais.')) return;
   try {
     showToast('Buscando nomes originais...','⏳');
@@ -10935,6 +10936,7 @@ async function autoRenomearRecuperados(){
 }
 
 async function renomearProdutoRecuperado(id,nomeEnc,emojiEnc,catEnc){
+  if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
   const nomeAtual=decodeURIComponent(nomeEnc);
   const emojiAtual=decodeURIComponent(emojiEnc);
   const catAtual=decodeURIComponent(catEnc);
@@ -10950,6 +10952,7 @@ async function renomearProdutoRecuperado(id,nomeEnc,emojiEnc,catEnc){
 }
 
 async function reconstruirProdutosOrfaos(){
+  if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
   if(!confirm('Reconstruir produtos DELETADOS do banco?\nEssa operacao religa os precos existentes.')) return;
   try {
     showToast('Verificando...','⏳');
@@ -10964,13 +10967,13 @@ async function reconstruirProdutosOrfaos(){
 }
 
 async function reativarTodosProdutos(){
-  if(!confirm('Reativar TODOS os produtos desativados?\nIsso recupera produtos (removido).')) return;
-  try {
-    showToast('Recuperando...','⏳');
+  if(!apiToken){showToast('Faça login novamente no admin','❌');return;}
+  showToast('Recuperando...','⏳');
+  try{
     const res=await apiReq('POST','/api/admin/reativar-todos-produtos',{});
     showToast(res.mensagem||(res.reativados+' reativado(s)!'),'✅');
     await carregarDadosBackend(); renderAdminForm();
-  } catch(e){ showToast('Erro: '+e.message,'❌'); }
+  }catch(e){showToast('Erro: '+e.message,'❌');}
 }
 
 async function limparPrecosOrfaos(){

@@ -438,10 +438,20 @@ const iaLimiter      = rateLimit({ windowMs: 60*1000, max: 20,
 const iaAdminLimiter = rateLimit({ windowMs: 60*1000, max: 300,
   message: { erro: 'Limite admin IA atingido.' }
 });
+// ── DIGITAL ASSET LINKS (Play Store TWA — remove barra do navegador) ────────
 app.get('/.well-known/assetlinks.json', (req, res) => {
-  res.setHeader('Content-Type','application/json');
-  res.json([{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.precocerto.piata","sha256_cert_fingerprints":["3D:F8:D6:3F:4D:43:B2:42:5F:E6:49:15:2C:7A:EC:24:64:2C:F3:C7:6E:C3:26:B0:33:36:05:EE:A3:D7:69:3F"]}}]);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json([{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.precocerto.piata",
+      "sha256_cert_fingerprints": ["3D:F8:D6:3F:4D:43:B2:42:5F:E6:49:15:2C:7A:EC:24:64:2C:F3:C7:6E:C3:26:B0:33:36:05:EE:A3:D7:69:3F"]
+    }
+  }]);
 });
+
 app.use('/api', limiter);
 
 // ═══════════════════════════════════════════════════════════
@@ -479,14 +489,7 @@ async function enviarEmail(para, assunto, html) {
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ erro: 'Token não fornecido' });
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    const previewMercId = req.headers['x-preview-mercado-id'];
-    if (previewMercId && req.user.tipo === 'admin') {
-      req.user = { ...req.user, tipo: 'mercado', mercadoId: previewMercId, login: 'admin-preview', _adminPreview: true };
-    }
-    next();
-  }
+  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
   catch { res.status(401).json({ erro: 'Sessão expirada — faça login novamente' }); }
 }
 
@@ -1520,138 +1523,6 @@ app.put('/api/admin/produtos/:id', adminAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
-
-// ══════════════════════════════════════════════════════════════════
-// RECUPERAÇÃO DE PRODUTOS DELETADOS
-// ══════════════════════════════════════════════════════════════════
-
-// Diagnóstico: mostra quais produtoIds estão em Preco mas não em Produto
-app.get('/api/admin/diagnostico-orfaos', adminAuth, async (req, res) => {
-  try {
-    const todosPrecos = await Preco.find({}, 'produtoId mercadoId preco');
-    const todosProdutosIds = new Set(
-      (await Produto.find({}, '_id')).map(p => String(p._id))
-    );
-    const orfaos = todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId)));
-    const orfaosIds = [...new Set(orfaos.map(p => String(p.produtoId)))];
-    
-    // Para cada ID órfão, buscar nas contribuições
-    const contribs = await Contribuicao.find(
-      { produtoId: { $in: orfaosIds } },
-      'produtoId obs'
-    );
-    
-    // Agrupar contribuições por produtoId para tentar extrair nomes
-    const nomesPorId = {};
-    for (const ct of contribs) {
-      const id = String(ct.produtoId);
-      if (!nomesPorId[id] && ct.obs) {
-        // Tentar extrair nome do obs
-        const m = ct.obs.match(/produto[^a-z]{0,5}([a-zA-Z0-9 ]{3,60})/i);
-        if (m) nomesPorId[id] = m[1].trim();
-      }
-    }
-    
-    // Também buscar nos logs de produto solicitado
-    const logs = await Log.find(
-      { tipo: 'produto_solicitado', nomeProduto: { $exists: true, $ne: '' } }
-    );
-    for (const log of logs) {
-      // Logs de solicitação não têm o ObjectId do produto deletado
-      // mas servem de referência de nomes que existiam
-    }
-    
-    res.json({
-      totalPrecos: todosPrecos.length,
-      totalProdutosAtivos: todosProdutosIds.size,
-      totalOrfaos: orfaosIds.length,
-      precosOrfaos: orfaos.length,
-      idsOrfaos: orfaosIds,
-      nomesPorId,
-      mensagem: `${orfaosIds.length} produto(s) deletados com ${orfaos.length} preço(s) associados`
-    });
-  } catch(e) { res.status(500).json({ erro: e.message }); }
-});
-
-// Reconstrução: recria os produtos deletados usando os IDs originais
-// Preserva os preços pois usa o mesmo ObjectId
-app.post('/api/admin/reconstruir-produtos-orfaos', adminAuth, async (req, res) => {
-  try {
-    const todosPrecos = await Preco.find({}, 'produtoId preco');
-    const todosProdutosIds = new Set(
-      (await Produto.find({}, '_id')).map(p => String(p._id))
-    );
-    const orfaosIds = [...new Set(
-      todosPrecos
-        .filter(p => !todosProdutosIds.has(String(p.produtoId)))
-        .map(p => String(p.produtoId))
-    )];
-    
-    if (!orfaosIds.length) {
-      return res.json({ ok: true, recriados: 0, mensagem: 'Nenhum produto órfão encontrado.' });
-    }
-    
-    // Tentar encontrar nomes nas contribuições
-    const contribs = await Contribuicao.find(
-      { produtoId: { $in: orfaosIds } },
-      'produtoId obs'
-    );
-    const nomesPorId = {};
-    for (const ct of contribs) {
-      const id = String(ct.produtoId);
-      if (!nomesPorId[id] && ct.obs) {
-        const m = ct.obs.match(/(?:produto|Produto)[^a-z]{0,5}([a-zA-Z0-9 ]{3,60})/);
-        if (m) nomesPorId[id] = m[1].trim();
-      }
-    }
-    
-    // Também buscar nos logs de solicitação de produto
-    const logsSol = await Log.find({ tipo: 'produto_solicitado', nomeProduto: { $exists: true } });
-    
-    // Recriar cada produto com o ID original
-    let recriados = 0;
-    const erros = [];
-    for (const idStr of orfaosIds) {
-      try {
-        const nome = nomesPorId[idStr] || `Produto ${idStr.slice(-6)}`;
-        const mongoose = require('mongoose');
-        const _id = new mongoose.Types.ObjectId(idStr);
-        await Produto.create({
-          _id,
-          nome,
-          emoji: '📦',
-          categoria: 'Recuperado',
-          ativo: true
-        });
-        recriados++;
-      } catch(e) {
-        erros.push({ id: idStr, erro: e.message });
-      }
-    }
-    
-    await registrarLog('admin',
-      `Reconstrução: ${recriados} produto(s) recriados de ${orfaosIds.length} órfãos`,
-      req.user.usuario, getIP(req));
-    
-    res.json({
-      ok: true,
-      recriados,
-      erros: erros.length,
-      detalhesErros: erros.slice(0,5),
-      mensagem: `✅ ${recriados} produto(s) recriado(s)! Os preços estão reliGados.`
-    });
-  } catch(e) { res.status(500).json({ erro: e.message }); }
-});
-
-// Reativar todos produtos inativados
-app.post('/api/admin/reativar-todos-produtos', adminAuth, async (req, res) => {
-  try {
-    const result = await Produto.updateMany({ ativo: false }, { $set: { ativo: true } });
-    await registrarLog('admin', `Reativação: ${result.modifiedCount} produto(s) reativado(s)`, req.user.usuario, getIP(req));
-    res.json({ ok: true, reativados: result.modifiedCount, mensagem: `✅ ${result.modifiedCount} produto(s) reativado(s)!` });
-  } catch(e) { res.status(500).json({ erro: e.message }); }
-});
-
 // ── SOLICITAÇÃO DE NOVO PRODUTO (cliente via IA) ──────────
 // Cliente solicita cadastro de produto detectado pela IA que não existe no catálogo
 app.post('/api/produtos/solicitar', authMiddleware, async (req, res) => {
@@ -2059,25 +1930,8 @@ app.post('/api/solicitacao-produto', authMiddleware, async (req, res) => {
 
 // ── CONTRIBUIÇÕES ────────────────────────────────────────
 app.get('/api/contribuicoes', adminAuth, async (req, res) => {
-  try {
-    const contribs = await Contribuicao.find().sort({ createdAt:-1 }).limit(200);
-    const prodIds=[...new Set(contribs.map(c=>String(c.produtoId)).filter(Boolean))];
-    const mercIds=[...new Set(contribs.map(c=>String(c.mercadoId)).filter(Boolean))];
-    const [prods,mercs]=await Promise.all([
-      Produto.find({_id:{$in:prodIds}},'nome emoji ativo'),
-      Mercado.find({_id:{$in:mercIds}},'nome icone')
-    ]);
-    const prodMap=Object.fromEntries(prods.map(p=>[String(p._id),p]));
-    const mercMap=Object.fromEntries(mercs.map(m=>[String(m._id),m]));
-    const result=contribs.map(c=>({
-      ...c.toObject(),
-      _produtoNome:prodMap[String(c.produtoId)]?.nome||null,
-      _produtoEmoji:prodMap[String(c.produtoId)]?.emoji||null,
-      _produtoAtivo:prodMap[String(c.produtoId)]?.ativo??null,
-      _mercadoNome:mercMap[String(c.mercadoId)]?.nome||null,
-    }));
-    res.json(result);
-  } catch(e) { res.status(500).json({ erro: e.message }); }
+  try { res.json(await Contribuicao.find().sort({ createdAt:-1 }).limit(200)); }
+  catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
 app.post('/api/contribuicoes', authMiddleware, async (req, res) => {
@@ -2675,19 +2529,14 @@ app.get('/api/fix-catalogo', async (req, res) => {
     // Pega nomes corretos do seed (versão atual)
     const nomesSeed = new Set(PRODUTOS_SEED.map(p => p.nome.toLowerCase().trim()));
 
-    // Remove produtos fora do seed SÓ SE não tiverem preço cadastrado
+    // Remove produtos cujo nome NÃO está no seed (os velhos com "un" errado etc.)
     const todos = await Produto.find({}, 'nome _id');
-    const comPrecoIds = new Set((await Preco.distinct('produtoId')).map(String));
-    const foraDoSeed = todos.filter(p => !nomesSeed.has(p.nome.toLowerCase().trim()));
-    const parasRemover = foraDoSeed.filter(p => !comPrecoIds.has(String(p._id)));
+    const parasRemover = todos.filter(p => !nomesSeed.has(p.nome.toLowerCase().trim()));
     let removidos = 0;
     if (parasRemover.length) {
       await Produto.deleteMany({ _id: { $in: parasRemover.map(p => p._id) } });
       removidos = parasRemover.length;
     }
-    // Reativar fora do seed que têm preço
-    const comPrecoFora = foraDoSeed.filter(p => comPrecoIds.has(String(p._id)));
-    if (comPrecoFora.length) await Produto.updateMany({ _id: { $in: comPrecoFora.map(p=>p._id) } }, { ativo:true });
 
     // Remove duplicatas — mantém apenas 1 de cada nome do seed
     for (const seedProd of PRODUTOS_SEED) {

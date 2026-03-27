@@ -1,120 +1,3 @@
-app.post('/api/admin/renomear-recuperados-auto', adminAuth, async (req, res) => {
-  try {
-    const recuperados = await Produto.find({ categoria: 'Recuperado', ativo: true }, '_id nome');
-    if (!recuperados.length) return res.json({ ok: true, renomeados: 0, mensagem: 'Nenhum produto para renomear.' });
-
-    const ids = recuperados.map(p => String(p._id));
-
-    // Buscar preços dos produtos recuperados
-    const precos = await Preco.find({ produtoId: { $in: recuperados.map(p => p._id) } });
-
-    // Montar mapa: produtoId → lista de {mercadoId, preco}
-    const precosPorProd = {};
-    for (const p of precos) {
-      const id = String(p.produtoId);
-      if (!precosPorProd[id]) precosPorProd[id] = [];
-      precosPorProd[id].push({ mercadoId: String(p.mercadoId), preco: p.preco });
-    }
-
-    // Buscar FilaIA concluídas — têm resultado com itens e nomes originais
-    const FilaIA = mongoose.model('FilaIA');
-    const filas = await FilaIA.find({ status: 'concluido', resultado: { $exists: true } }, 'mercadoId resultado');
-
-    // Para cada fila, mapear: mercadoId + preco → nome do produto
-    // Estrutura: filaMap[mercadoId][preco_arredondado] = [{nome, emoji, categoria}]
-    const filaMap = {};
-    for (const fila of filas) {
-      const mercId = String(fila.mercadoId);
-      if (!filaMap[mercId]) filaMap[mercId] = {};
-      const itens = fila.resultado?.itens || [];
-      for (const it of itens) {
-        if (!it.produto || !it.preco) continue;
-        const precoKey = Math.round(it.preco * 100); // centavos para evitar float
-        if (!filaMap[mercId][precoKey]) filaMap[mercId][precoKey] = [];
-        filaMap[mercId][precoKey].push({
-          nome: it.produto,
-          emoji: it.emoji || '📦',
-          categoria: it.categoria || 'Alimentos'
-        });
-      }
-    }
-
-    // Também buscar no NfceCache — itens das notas fiscais
-    const caches = await NfceCache.find({}, 'itens');
-    const nfceMap = {}; // precoKey → [{nome}]
-    for (const cache of caches) {
-      for (const it of (cache.itens || [])) {
-        if (!it.produto || !it.preco) continue;
-        const precoKey = Math.round(it.preco * 100);
-        if (!nfceMap[precoKey]) nfceMap[precoKey] = [];
-        nfceMap[precoKey].push({ nome: it.produto, emoji: '📦', categoria: 'Alimentos' });
-      }
-    }
-
-    let renomeados = 0;
-    const naoCombinados = [];
-
-    for (const prod of recuperados) {
-      const idStr = String(prod._id);
-      const precosDoProd = precosPorProd[idStr] || [];
-      if (!precosDoProd.length) { naoCombinados.push(idStr); continue; }
-
-      let melhorNome = null;
-      let melhorEmoji = '📦';
-      let melhorCat = 'Alimentos';
-
-      // Tentar casar: para cada preço do produto, buscar no FilaIA do mesmo mercado
-      for (const { mercadoId, preco } of precosDoProd) {
-        const precoKey = Math.round(preco * 100);
-        const candidatos = filaMap[mercadoId]?.[precoKey] || [];
-        if (candidatos.length === 1) {
-          // Correspondência única — alta confiança
-          melhorNome = candidatos[0].nome;
-          melhorEmoji = candidatos[0].emoji;
-          melhorCat = candidatos[0].categoria;
-          break;
-        }
-      }
-
-      // Se não achou no FilaIA, tentar NfceCache (qualquer mercado, mesmo preço)
-      if (!melhorNome) {
-        for (const { preco } of precosDoProd) {
-          const precoKey = Math.round(preco * 100);
-          const candidatos = nfceMap[precoKey] || [];
-          if (candidatos.length === 1) {
-            melhorNome = candidatos[0].nome;
-            break;
-          }
-        }
-      }
-
-      if (melhorNome) {
-        await Produto.findByIdAndUpdate(prod._id, {
-          nome: melhorNome,
-          emoji: melhorEmoji,
-          categoria: melhorCat
-        });
-        renomeados++;
-      } else {
-        naoCombinados.push(idStr);
-      }
-    }
-
-    await registrarLog('admin',
-      `Auto-renomeação: ${renomeados}/${recuperados.length} produtos recuperados`,
-      req.user.usuario, getIP(req));
-
-    res.json({
-      ok: true,
-      renomeados,
-      total: recuperados.length,
-      naoCombinados: naoCombinados.length,
-      mensagem: renomeados === recuperados.length
-        ? `✅ Todos os ${renomeados} produtos foram renomeados automaticamente!`
-        : `✅ ${renomeados} de ${recuperados.length} renomeados. ${naoCombinados.length} precisam de renomeação manual (preços ambíguos ou sem histórico).`
-    });
-  } catch(e) { res.status(500).json({ erro: e.message }); }
-});
 /**
  * PreçoCerto — Backend v8
  * ════════════════════════════════════════════════════════════
@@ -555,6 +438,7 @@ const iaLimiter      = rateLimit({ windowMs: 60*1000, max: 20,
 const iaAdminLimiter = rateLimit({ windowMs: 60*1000, max: 300,
   message: { erro: 'Limite admin IA atingido.' }
 });
+app.get('/.well-known/assetlinks.json',(req,res)=>{res.setHeader('Content-Type','application/json');res.json([{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.precocerto.piata","sha256_cert_fingerprints":["3D:F8:D6:3F:4D:43:B2:42:5F:E6:49:15:2C:7A:EC:24:64:2C:F3:C7:6E:C3:26:B0:33:36:05:EE:A3:D7:69:3F"]}}]);});
 app.use('/api', limiter);
 
 // ═══════════════════════════════════════════════════════════
@@ -592,7 +476,14 @@ async function enviarEmail(para, assunto, html) {
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ erro: 'Token não fornecido' });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    const previewMercId = req.headers['x-preview-mercado-id'];
+    if (previewMercId && req.user.tipo === 'admin') {
+      req.user = { ...req.user, tipo: 'mercado', mercadoId: previewMercId, login: 'admin-preview', _adminPreview: true };
+    }
+    next();
+  }
   catch { res.status(401).json({ erro: 'Sessão expirada — faça login novamente' }); }
 }
 
@@ -1626,6 +1517,232 @@ app.put('/api/admin/produtos/:id', adminAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
+
+// ── RECUPERAÇÃO DE PRODUTOS ──────────────────────────────────────
+
+app.post('/api/admin/reativar-todos-produtos', adminAuth, async (req, res) => {
+  try {
+    const result = await Produto.updateMany({ ativo: false }, { $set: { ativo: true } });
+    await registrarLog('admin', `Reativação: ${result.modifiedCount} produto(s) reativado(s)`, req.user.usuario, getIP(req));
+    res.json({ ok: true, reativados: result.modifiedCount, mensagem: `✅ ${result.modifiedCount} produto(s) reativado(s)!` });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get('/api/admin/diagnostico-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find({}, 'produtoId');
+    const todosProdutosIds = new Set((await Produto.find({}, '_id')).map(p => String(p._id)));
+    const orfaos = todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId)));
+    const orfaosIds = [...new Set(orfaos.map(p => String(p.produtoId)))];
+    res.json({ totalOrfaos: orfaosIds.length, precosOrfaos: orfaos.length, idsOrfaos: orfaosIds });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post('/api/admin/reconstruir-produtos-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find({}, 'produtoId');
+    const todosProdutosIds = new Set((await Produto.find({}, '_id')).map(p => String(p._id)));
+    const orfaosIds = [...new Set(todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId))).map(p => String(p.produtoId)))];
+    if (!orfaosIds.length) return res.json({ ok: true, recriados: 0, mensagem: 'Nenhum produto órfão.' });
+    let recriados = 0;
+    for (const idStr of orfaosIds) {
+      try {
+        await Produto.create({ _id: new mongoose.Types.ObjectId(idStr), nome: 'Produto ' + idStr.slice(-6), emoji: '📦', categoria: 'Recuperado', ativo: true });
+        recriados++;
+      } catch(e) {}
+    }
+    await registrarLog('admin', `Reconstrução: ${recriados} produto(s) recriados`, req.user.usuario, getIP(req));
+    res.json({ ok: true, recriados, mensagem: `✅ ${recriados} produto(s) recriado(s)! Acesse Produtos > 🔧 para renomeá-los.` });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post('/api/admin/renomear-recuperados-auto', adminAuth, async (req, res) => {
+  try {
+    const recuperados = await Produto.find({ categoria: 'Recuperado', ativo: true }, '_id nome');
+    if (!recuperados.length) return res.json({ ok: true, renomeados: 0, mensagem: 'Nenhum produto para renomear.' });
+    const precos = await Preco.find({ produtoId: { $in: recuperados.map(p => p._id) } });
+    const precosPorProd = {};
+    for (const p of precos) {
+      const id = String(p.produtoId);
+      if (!precosPorProd[id]) precosPorProd[id] = [];
+      precosPorProd[id].push({ mercadoId: String(p.mercadoId), preco: p.preco });
+    }
+    // Buscar nomes no FilaIA
+    const filas = await FilaIA.find({ status: 'concluido', resultado: { $exists: true } }, 'mercadoId resultado');
+    const filaMap = {};
+    for (const fila of filas) {
+      const mercId = String(fila.mercadoId);
+      if (!filaMap[mercId]) filaMap[mercId] = {};
+      for (const it of (fila.resultado?.itens || [])) {
+        if (!it.produto || !it.preco) continue;
+        const key = Math.round(it.preco * 100);
+        if (!filaMap[mercId][key]) filaMap[mercId][key] = [];
+        filaMap[mercId][key].push({ nome: it.produto, emoji: it.emoji || '📦', categoria: it.categoria || 'Alimentos' });
+      }
+    }
+    // Buscar nomes no NfceCache
+    const caches = await NfceCache.find({}, 'itens');
+    const nfceMap = {};
+    for (const cache of caches) {
+      for (const it of (cache.itens || [])) {
+        if (!it.produto || !it.preco) continue;
+        const key = Math.round(it.preco * 100);
+        if (!nfceMap[key]) nfceMap[key] = [];
+        nfceMap[key].push({ nome: it.produto });
+      }
+    }
+    let renomeados = 0;
+    for (const prod of recuperados) {
+      const idStr = String(prod._id);
+      const precosDoProd = precosPorProd[idStr] || [];
+      let melhor = null;
+      for (const { mercadoId, preco } of precosDoProd) {
+        const key = Math.round(preco * 100);
+        const cands = filaMap[mercadoId]?.[key] || [];
+        if (cands.length === 1) { melhor = cands[0]; break; }
+      }
+      if (!melhor) {
+        for (const { preco } of precosDoProd) {
+          const key = Math.round(preco * 100);
+          const cands = nfceMap[key] || [];
+          if (cands.length === 1) { melhor = cands[0]; break; }
+        }
+      }
+      if (melhor) {
+        await Produto.findByIdAndUpdate(prod._id, { nome: melhor.nome, emoji: melhor.emoji || '📦', categoria: melhor.categoria || 'Alimentos' });
+        renomeados++;
+      }
+    }
+    await registrarLog('admin', `Auto-renomeação: ${renomeados}/${recuperados.length}`, req.user.usuario, getIP(req));
+    res.json({ ok: true, renomeados, total: recuperados.length,
+      mensagem: `✅ ${renomeados} de ${recuperados.length} produto(s) renomeados! ${recuperados.length - renomeados} precisam de renomeação manual.`
+    });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════
+// RECUPERAÇÃO DE PRODUTOS DELETADOS
+// ══════════════════════════════════════════════════════════
+
+app.post('/api/admin/reativar-todos-produtos', adminAuth, async (req, res) => {
+  try {
+    const result = await Produto.updateMany({ ativo: false }, { $set: { ativo: true } });
+    await registrarLog('admin', `Reativação: ${result.modifiedCount} produto(s) reativado(s)`, req.user.usuario, getIP(req));
+    res.json({ ok: true, reativados: result.modifiedCount, mensagem: `✅ ${result.modifiedCount} produto(s) reativado(s)!` });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.get('/api/admin/diagnostico-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find({}, 'produtoId');
+    const todosProdutosIds = new Set((await Produto.find({}, '_id')).map(p => String(p._id)));
+    const orfaos = todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId)));
+    const orfaosIds = [...new Set(orfaos.map(p => String(p.produtoId)))];
+    res.json({ totalOrfaos: orfaosIds.length, precosOrfaos: orfaos.length, idsOrfaos: orfaosIds });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post('/api/admin/reconstruir-produtos-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find({}, 'produtoId');
+    const todosProdutosIds = new Set((await Produto.find({}, '_id')).map(p => String(p._id)));
+    const orfaosIds = [...new Set(todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId))).map(p => String(p.produtoId)))];
+    if (!orfaosIds.length) return res.json({ ok: true, recriados: 0, mensagem: 'Nenhum produto órfão.' });
+    let recriados = 0;
+    for (const idStr of orfaosIds) {
+      try {
+        const _id = new mongoose.Types.ObjectId(idStr);
+        await Produto.create({ _id, nome: 'Produto ' + idStr.slice(-6), emoji: '📦', categoria: 'Recuperado', ativo: true });
+        recriados++;
+      } catch(e) {}
+    }
+    await registrarLog('admin', `Reconstrução: ${recriados} produto(s) recriados`, req.user.usuario, getIP(req));
+    res.json({ ok: true, recriados, mensagem: `✅ ${recriados} produto(s) recriado(s)! Acesse Produtos > 🔧 para renomear.` });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+app.post('/api/admin/renomear-recuperados-auto', adminAuth, async (req, res) => {
+  try {
+    const recuperados = await Produto.find({ categoria: 'Recuperado', ativo: true }, '_id nome');
+    if (!recuperados.length) return res.json({ ok: true, renomeados: 0, mensagem: 'Nenhum produto para renomear.' });
+
+    const precos = await Preco.find({ produtoId: { $in: recuperados.map(p => p._id) } });
+    const precosPorProd = {};
+    for (const p of precos) {
+      const id = String(p.produtoId);
+      if (!precosPorProd[id]) precosPorProd[id] = [];
+      precosPorProd[id].push({ mercadoId: String(p.mercadoId), preco: p.preco });
+    }
+
+    // Buscar nomes no histórico da FilaIA (fonte mais confiável)
+    const filas = await FilaIA.find({ status: 'concluido', resultado: { $exists: true } }, 'mercadoId resultado');
+    const filaMap = {};
+    for (const fila of filas) {
+      const mercId = String(fila.mercadoId);
+      if (!filaMap[mercId]) filaMap[mercId] = {};
+      for (const it of (fila.resultado?.itens || [])) {
+        if (!it.produto || !it.preco) continue;
+        const k = Math.round(it.preco * 100);
+        if (!filaMap[mercId][k]) filaMap[mercId][k] = [];
+        filaMap[mercId][k].push({ nome: it.produto, emoji: it.emoji || '📦', categoria: it.categoria || 'Alimentos' });
+      }
+    }
+
+    // Buscar nomes no NfceCache (notas fiscais)
+    const caches = await NfceCache.find({}, 'itens');
+    const nfceMap = {};
+    for (const cache of caches) {
+      for (const it of (cache.itens || [])) {
+        if (!it.produto || !it.preco) continue;
+        const k = Math.round(it.preco * 100);
+        if (!nfceMap[k]) nfceMap[k] = [];
+        nfceMap[k].push({ nome: it.produto });
+      }
+    }
+
+    let renomeados = 0;
+    let naoCombinados = 0;
+    for (const prod of recuperados) {
+      const idStr = String(prod._id);
+      const precosDoProd = precosPorProd[idStr] || [];
+      if (!precosDoProd.length) { naoCombinados++; continue; }
+
+      let melhorNome = null, melhorEmoji = '📦', melhorCat = 'Alimentos';
+
+      // Tentar FilaIA primeiro (mercado + preço exato)
+      for (const { mercadoId, preco } of precosDoProd) {
+        const k = Math.round(preco * 100);
+        const cands = filaMap[mercadoId]?.[k] || [];
+        if (cands.length === 1) { melhorNome = cands[0].nome; melhorEmoji = cands[0].emoji; melhorCat = cands[0].categoria; break; }
+      }
+
+      // Fallback: NfceCache (qualquer mercado, preço exato único)
+      if (!melhorNome) {
+        for (const { preco } of precosDoProd) {
+          const k = Math.round(preco * 100);
+          const cands = nfceMap[k] || [];
+          if (cands.length === 1) { melhorNome = cands[0].nome; break; }
+        }
+      }
+
+      if (melhorNome) {
+        await Produto.findByIdAndUpdate(prod._id, { nome: melhorNome, emoji: melhorEmoji, categoria: melhorCat });
+        renomeados++;
+      } else {
+        naoCombinados++;
+      }
+    }
+
+    await registrarLog('admin', `Auto-renomeação: ${renomeados}/${recuperados.length} produtos`, req.user.usuario, getIP(req));
+    res.json({
+      ok: true, renomeados, total: recuperados.length, naoCombinados,
+      mensagem: renomeados === recuperados.length
+        ? `✅ Todos os ${renomeados} produtos foram renomeados automaticamente!`
+        : `✅ ${renomeados} de ${recuperados.length} renomeados. ${naoCombinados} precisam de revisão manual.`
+    });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 // ── SOLICITAÇÃO DE NOVO PRODUTO (cliente via IA) ──────────
 // Cliente solicita cadastro de produto detectado pela IA que não existe no catálogo
 app.post('/api/produtos/solicitar', authMiddleware, async (req, res) => {
@@ -2033,8 +2150,15 @@ app.post('/api/solicitacao-produto', authMiddleware, async (req, res) => {
 
 // ── CONTRIBUIÇÕES ────────────────────────────────────────
 app.get('/api/contribuicoes', adminAuth, async (req, res) => {
-  try { res.json(await Contribuicao.find().sort({ createdAt:-1 }).limit(200)); }
-  catch(e) { res.status(500).json({ erro: e.message }); }
+  try {
+    const cs=await Contribuicao.find().sort({createdAt:-1}).limit(200);
+    const pIds=[...new Set(cs.map(c=>String(c.produtoId)).filter(Boolean))];
+    const mIds=[...new Set(cs.map(c=>String(c.mercadoId)).filter(Boolean))];
+    const [prods,mercs]=await Promise.all([Produto.find({_id:{$in:pIds}},'nome emoji ativo'),Mercado.find({_id:{$in:mIds}},'nome icone')]);
+    const pm=Object.fromEntries(prods.map(p=>[String(p._id),p]));
+    const mm=Object.fromEntries(mercs.map(m=>[String(m._id),m]));
+    res.json(cs.map(c=>({...c.toObject(),_produtoNome:pm[String(c.produtoId)]?.nome||null,_produtoEmoji:pm[String(c.produtoId)]?.emoji||null,_produtoAtivo:pm[String(c.produtoId)]?.ativo??null,_mercadoNome:mm[String(c.mercadoId)]?.nome||null})));
+  } catch(e){res.status(500).json({erro:e.message});}
 });
 
 app.post('/api/contribuicoes', authMiddleware, async (req, res) => {
@@ -2632,14 +2756,18 @@ app.get('/api/fix-catalogo', async (req, res) => {
     // Pega nomes corretos do seed (versão atual)
     const nomesSeed = new Set(PRODUTOS_SEED.map(p => p.nome.toLowerCase().trim()));
 
-    // Remove produtos cujo nome NÃO está no seed (os velhos com "un" errado etc.)
+    // PROTEÇÃO: só remove produtos fora do seed SEM preço cadastrado
     const todos = await Produto.find({}, 'nome _id');
-    const parasRemover = todos.filter(p => !nomesSeed.has(p.nome.toLowerCase().trim()));
+    const comPrecoIds = new Set((await Preco.distinct('produtoId')).map(String));
+    const foraDoSeed = todos.filter(p => !nomesSeed.has(p.nome.toLowerCase().trim()));
+    const parasRemover = foraDoSeed.filter(p => !comPrecoIds.has(String(p._id)));
     let removidos = 0;
     if (parasRemover.length) {
       await Produto.deleteMany({ _id: { $in: parasRemover.map(p => p._id) } });
       removidos = parasRemover.length;
     }
+    const comPrecoFora = foraDoSeed.filter(p => comPrecoIds.has(String(p._id)));
+    if (comPrecoFora.length) await Produto.updateMany({ _id: { $in: comPrecoFora.map(p=>p._id) } }, { ativo:true });
 
     // Remove duplicatas — mantém apenas 1 de cada nome do seed
     for (const seedProd of PRODUTOS_SEED) {
@@ -2667,9 +2795,14 @@ app.post('/api/admin/limpar-duplicatas', adminAuth, async (req, res) => {
   try {
     let removidos = 0;
 
-    // PASSO 1: Apaga TUDO e reinsere só o seed limpo
+    // PASSO 1: Salvar produtos com preço antes de apagar
+    const comPrecoIdsSalvos = new Set((await Preco.distinct('produtoId')).map(String));
+    const produtosComPrecoSalvos = await Produto.find({ _id: { $in: [...comPrecoIdsSalvos] } });
     await Produto.deleteMany({});
     const resultado = await Produto.insertMany(PRODUTOS_SEED, { ordered: false });
+    const nomesSeedSetSalvos = new Set(PRODUTOS_SEED.map(p => p.nome.toLowerCase().trim()));
+    const manuaisComPrecoSalvos = produtosComPrecoSalvos.filter(p => !nomesSeedSetSalvos.has(p.nome.toLowerCase().trim()));
+    if (manuaisComPrecoSalvos.length) { await Produto.insertMany(manuaisComPrecoSalvos.map(p=>({nome:p.nome,emoji:p.emoji,categoria:p.categoria,ativo:true})),{ordered:false}).catch(()=>{}); }
     const total = await Produto.countDocuments({ ativo: true });
 
     await registrarLog('admin', `Limpeza catálogo: banco resetado com ${total} produtos do seed.`, req.user.usuario, getIP(req));

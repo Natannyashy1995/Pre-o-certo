@@ -10893,6 +10893,25 @@ async function excluirPreco(produtoId, mercadoId){
 }
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
+async function reconstruirProdutosOrfaos(){
+  if(!confirm('Reconstruir produtos DELETADOS do banco?\n\nEssa operacao religa os precos existentes.\nProdutos recriados ficam com categoria Recuperado.')) return;
+  try {
+    showToast('Verificando produtos deletados...','⏳');
+    const diag = await apiReq('GET','/api/admin/diagnostico-orfaos');
+    if(!diag || !diag.totalOrfaos){
+      showToast('Nenhum produto deletado encontrado!','✅'); return;
+    }
+    if(!confirm('Encontrados '+diag.totalOrfaos+' produto(s) deletados com '+diag.precosOrfaos+' preco(s).\n\nReconstruir agora?')) return;
+    showToast('Reconstruindo...','⏳');
+    const res = await apiReq('POST','/api/admin/reconstruir-produtos-orfaos',{});
+    showToast(res.mensagem||'Reconstrucao concluida!','✅');
+    await carregarDadosBackend();
+    renderAdminForm();
+  } catch(e){
+    showToast('Erro: '+e.message,'❌');
+  }
+}
+
 async function reativarTodosProdutos(){
   if(!confirm('Reativar TODOS os produtos que foram desativados?\n\nIsso recupera os produtos que aparecem como (removido).\nNenhum dado e apagado.')) return;
   try {

@@ -10893,12 +10893,12 @@ async function excluirPreco(produtoId, mercadoId){
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
 async function reativarTodosProdutos(){
-  if(!confirm('Reativar TODOS os produtos que foram desativados?\n\nIsso recupera os produtos que aparecem como (removido).\nNenhum dado é apagado.')) return;
+  if(!confirm('Reativar TODOS os produtos que foram desativados?\n\nIsso recupera os produtos que aparecem como (removido).\nNenhum dado e apagado.')) return;
   try {
     showToast('Recuperando produtos...','⏳');
     const res = await apiReq('POST','/api/admin/reativar-todos-produtos',{});
     showToast(res.mensagem || (res.reativados+' produto(s) reativado(s)!'),'✅');
-    await carregarDados();
+    await carregarDadosBackend();
     renderAdminForm();
   } catch(e){
     showToast('Erro: '+e.message,'❌');

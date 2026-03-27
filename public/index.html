@@ -1242,9 +1242,6 @@ async function apiReq(method, path, body=null, auth=true){
   try {
     const headers = { 'Content-Type':'application/json' };
     if(auth && apiToken) headers['Authorization'] = 'Bearer ' + apiToken;
-    if(mercadoLogado?._adminPreview && mercadoLogado?.id) {
-      headers['X-Preview-Mercado-Id'] = String(mercadoLogado.id);
-    }
     const opts = { method, headers };
     if(body) opts.body = JSON.stringify(body);
     const controller = new AbortController();
@@ -1578,9 +1575,7 @@ async function carregarDadosBackend(){
         preco: p.preco,
         dataAtu: p.dataAtu || hoje(),
         fonte: p.fonte || 'admin',
-        autor: p.autor || 'Admin',
-        _produtoNome: p.produtoId?.nome || null,
-        _produtoEmoji: p.produtoId?.emoji || null
+        autor: p.autor || 'Admin'
       }));
       console.log('✅ Preços carregados:', db.precos.length);
     }
@@ -1660,10 +1655,6 @@ async function carregarDadosAdmin(){
       _id: c._id,
       produtoId: c.produtoId?._id || c.produtoId,
       mercadoId: c.mercadoId?._id || c.mercadoId,
-      _produtoNome: c._produtoNome || null,
-      _produtoEmoji: c._produtoEmoji || null,
-      _produtoAtivo: c._produtoAtivo ?? null,
-      _mercadoNome: c._mercadoNome || null,
       clienteId: c.clienteId?._id || c.clienteId,
     }));
     if(Array.isArray(ocorrencias)) db.ocorrencias = ocorrencias.map(o=>({...o, id: o._id}));
@@ -6227,8 +6218,8 @@ function renderPortal(){
     body.innerHTML=`
       <div style="font-size:13px;color:var(--muted);font-weight:600;padding:4px 0;">${meusPrecos.length} produto(s) com preço cadastrado</div>
       ${meusPrecos.map(p=>{const prod=db.produtos.find(pr=>String(pr._id||pr.id)===String(p.produtoId));return`<div style="background:#fff;border:1.5px solid var(--borda);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(11,79,138,.06);">
-        <span style="font-size:22px;">${prod?prod.emoji:(p._produtoEmoji||'📦')}</span>
-        <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--texto);">${prod?prod.nome:(p._produtoNome||'(removido)')}</div>
+        <span style="font-size:22px;">${prod?prod.emoji:'📦'}</span>
+        <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--texto);">${prod?prod.nome:'?'}</div>
         <div style="margin-top:3px;">${freshnessHTML(p.dataAtu)}</div></div>
         <div style="text-align:right;"><div style="font-family:var(--font-title);font-weight:900;font-size:16px;color:var(--azul-esc);">R$ ${fmt(p.preco)}</div><div style="font-size:10px;color:var(--muted);margin-top:1px;">${p.dataAtu||'—'}</div></div>
       </div>`;}).join('')||'<div style="text-align:center;color:var(--muted);padding:30px 0;font-size:13px;">Nenhum preço cadastrado ainda</div>'}`;
@@ -6731,8 +6722,6 @@ function renderAdminForm(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button onclick="corrigirEmojiCategoriaDb()" style="background:#8B5CF6;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Corrigir Emoji/Cat</button>
         <button onclick="limparPrecosOrfaos()" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Limpar Preços Órfãos</button>
-        <button onclick="reativarTodosProdutos()" style="background:#22C55E;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🔄 Recuperar Produtos</button>
-        <button onclick="reconstruirProdutosOrfaos()" style="background:#EF4444;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🔧 Reconstruir Deletados</button>
       </div>
 
       <!-- MERCADOS CADASTRADOS -->
@@ -6779,7 +6768,7 @@ function renderAdminForm(){
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💰 Preços cadastrados</div>
               <div style="display:flex;flex-direction:column;gap:5px;">
                 ${mPrecos.map(p=>{const pId=String(p.produtoId?._id||p.produtoId||'');const prod=db.produtos.find(pr=>String(pr._id||pr.id)===pId);const f=freshnessInfo(p.dataAtu);return`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--card2);border-radius:8px;">
-                  <span style="font-size:18px;">${prod?prod.emoji:(p._produtoEmoji||'📦')}</span>
+                  <span style="font-size:18px;">${prod?prod.emoji:'📦'}</span>
                   <span style="flex:1;font-size:12px;font-weight:500;">${prod?prod.nome:'(removido)'}</span>
                   <span class="freshness ${f.cls}" style="font-size:10px;">${f.txt}</span>
                   <span style="font-family:var(--font-title);font-size:13px;font-weight:700;color:var(--verde);">R$ ${fmt(p.preco)}</span>
@@ -6792,8 +6781,8 @@ function renderAdminForm(){
             <div>
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🔥 Promoções ativas</div>
               ${mPromos.map(pr=>{const prod=db.produtos.find(p=>String(p.id)===String(pr.produtoId)||String(p._id)===String(pr.produtoId));return`<div style="background:#FFD23F10;border:1px solid #FFD23F30;border-radius:8px;padding:9px 10px;display:flex;align-items:center;gap:8px;">
-                <span style="font-size:17px;">${prod?prod.emoji:(p._produtoEmoji||'📦')}</span>
-                <div style="flex:1;"><div style="font-size:12px;font-weight:600;">${prod?prod.nome:(p._produtoNome||'(removido)')}</div><div style="font-size:11px;color:var(--muted);">${pr.descricao}</div></div>
+                <span style="font-size:17px;">${prod?prod.emoji:'📦'}</span>
+                <div style="flex:1;"><div style="font-size:12px;font-weight:600;">${prod?prod.nome:'?'}</div><div style="font-size:11px;color:var(--muted);">${pr.descricao}</div></div>
                 <div style="text-align:right;"><div style="font-size:10px;color:var(--muted);text-decoration:line-through;">R$ ${fmt(pr.precoNormal)}</div><div style="font-family:var(--font-title);font-size:13px;font-weight:700;color:var(--amarelo);">R$ ${fmt(pr.precoPromo)}</div></div>
                 <button data-pid="${pr.id||pr._id}" onclick="removerPromoAdmin(this.dataset.pid)" style="background:transparent;border:none;font-size:14px;cursor:pointer;color:var(--muted);">🗑️</button>
               </div>`;}).join('')}
@@ -6833,9 +6822,9 @@ function renderAdminForm(){
         const merc=db.mercados.find(m=>String(m.id)===String(pr.mercadoId)||String(m._id)===String(pr.mercadoId));
         const desc=Math.round((1-(pr.precoPromo/pr.precoNormal))*100);
         return`<div style="background:linear-gradient(135deg,#FFD23F10,#FF704310);border:1px solid #FFD23F30;border-radius:13px;padding:13px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:26px;">${prod?prod.emoji:(p._produtoEmoji||'📦')}</span>
+          <span style="font-size:26px;">${prod?prod.emoji:'📦'}</span>
           <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;">${prod?prod.nome:(p._produtoNome||'(removido)')}</div>
+            <div style="font-size:13px;font-weight:700;">${prod?prod.nome:'?'}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:2px;">🏪 ${merc?merc.nome:'?'} • Até ${pr.validade}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:1px;">${pr.descricao}</div>
           </div>
@@ -6871,7 +6860,7 @@ function renderAdminForm(){
               ${c.tipo==='report'?'<span style="font-size:11px;background:#FF525218;color:var(--vermelho);padding:2px 8px;border-radius:100px;">⚠️ Report</span>':''}
               <span class="contrib-autor">👤 ${c.autor} • ${c.data}</span>
             </div>
-            <div style="font-size:14px;font-weight:600;">${prod?(prod.emoji+' '+prod.nome):(c._produtoEmoji&&c._produtoNome?(c._produtoEmoji+' '+c._produtoNome+(c._produtoAtivo===false?' (removido)':'')):'Produto desconhecido')}</div>
+            <div style="font-size:14px;font-weight:600;">${prod?prod.emoji+' '+prod.nome:'Produto desconhecido'}</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">🏪 ${merc?merc.nome:'Mercado desconhecido'}</div>
             ${c.preco?`<div style="font-family:var(--font-title);font-size:20px;font-weight:800;color:var(--verde);margin-top:6px;">R$ ${fmt(c.preco)}</div>`:''}
             ${c.motivo?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">Motivo: ${c.motivo}</div>`:''}
@@ -7093,12 +7082,43 @@ function renderAdminForm(){
   }else if(tabAtiva==='produto'){
     // Subtabs: manual | foto_ia | qr
     const prodSubTab = window._prodSubTab || 'manual';
+
+    // Subtab recuperados — renderiza separadamente sem template string aninhada
+    if(prodSubTab==='recuperados'){
+      const prodsRec = db.produtos.filter(p=>p.categoria==='Recuperado');
+      let htmlRec = '<div style="display:flex;gap:6px;background:var(--card2);border-radius:12px;padding:5px;margin-bottom:12px;">' +
+        '<button onclick="setProdSubTab(\'manual\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">✏️ Manual</button>' +
+        '<button onclick="setProdSubTab(\'foto_ia\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">📷 Foto IA</button>' +
+        '<button onclick="setProdSubTab(\'qr\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">📱 QR Nota</button>' +
+        '<button onclick="setProdSubTab(\'recuperados\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:#EF4444;color:#fff;">🔧 ('+prodsRec.length+')</button>' +
+      '</div>';
+      if(!prodsRec.length){
+        htmlRec += '<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">✅ Nenhum produto pendente de renomeação!</div>';
+      } else {
+        htmlRec += '<div style="display:flex;align-items:center;gap:8px;background:#FEF3C7;border-radius:8px;padding:8px 10px;margin-bottom:8px;">' +'<div style="flex:1;font-size:12px;color:#B45309;font-weight:600;">'+prodsRec.length+' produto(s) aguardando renomeação</div>' +'<button onclick="autoRenomearRecuperados()" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🤖 Auto-Renomear</button>' +'</div>';
+        htmlRec += prodsRec.map(function(p){
+          return '<div style="background:#fff;border:1.5px solid #FCA5A5;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+            '<span style="font-size:20px;">'+(p.emoji||'📦')+'</span>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:13px;font-weight:700;color:#7F1D1D;">'+(p.nome||'')+'</div>' +
+              '<div style="font-size:10px;color:var(--muted);">preços ligados a este produto</div>' +
+            '</div>' +
+            '<button onclick="renomearProdutoRecuperado(\''+String(p._id||p.id)+'\',\''+encodeURIComponent(p.nome||'')+'\',\''+encodeURIComponent(p.emoji||'📦')+'\',\''+encodeURIComponent(p.categoria||'Recuperado')+'\')" ' +
+            'style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ Renomear</button>' +
+          '</div>';
+        }).join('');
+      }
+      form.innerHTML = htmlRec;
+      return;
+    }
+
     form.innerHTML=`
       <!-- SUBTABS -->
       <div style="display:flex;gap:6px;background:var(--card2);border-radius:12px;padding:5px;">
         <button onclick="setProdSubTab('manual')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='manual'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">✏️ Manual</button>
         <button onclick="setProdSubTab('foto_ia')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='foto_ia'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">📷 Foto IA</button>
         <button onclick="setProdSubTab('qr')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='qr'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">📱 QR Nota</button>
+        <button onclick="setProdSubTab('recuperados')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='recuperados'?'background:#EF4444;color:#fff;':'background:transparent;color:var(--muted);'}">🔧 (${db.produtos.filter(p=>p.categoria==='Recuperado').length})</button>
       </div>
 
       ${prodSubTab==='manual'?`
@@ -7310,7 +7330,6 @@ function renderAdminForm(){
           <button onclick="editarMercado('${m._id||m.id}')" style="flex:1;background:transparent;border:none;padding:9px 4px;font-size:11px;font-weight:700;color:var(--azul);cursor:pointer;">✏️ Editar</button>
           <button onclick="alterarPlanoMercado('${m._id||m.id}','${m.nome.replace(/'/g,"\'")}')" style="flex:1;background:transparent;border:none;padding:9px 4px;font-size:11px;font-weight:700;color:#F59E0B;cursor:pointer;border-left:1px solid var(--borda);">⭐ Plano</button>
           <button onclick="toggleParceiro('${m._id||m.id}',${!m.parceiro})" style="flex:1;background:transparent;border:none;padding:9px 4px;font-size:11px;font-weight:700;color:${m.parceiro?'var(--vermelho)':'var(--verde)'};cursor:pointer;border-left:1px solid var(--borda);">${m.parceiro?'❌ Parc':'⭐ Parc'}</button>
-          <button onclick="adminVerPortalMercado('${m._id||m.id}')" style="flex:1;background:transparent;border:none;padding:9px 4px;font-size:11px;font-weight:700;color:#8B5CF6;cursor:pointer;border-left:1px solid var(--borda);">👁️ Portal</button>
           <button onclick="excluirMercado('${m._id||m.id}')" style="flex:1;background:transparent;border:none;padding:9px 4px;font-size:11px;font-weight:700;color:var(--vermelho);cursor:pointer;border-left:1px solid var(--borda);">🗑️ Excluir</button>
         </div>
       </div>`;
@@ -9532,21 +9551,6 @@ async function salvarProduto(){
   renderAdminForm();
 }
 // Preenche o form de mercado para editar um existente
-function adminVerPortalMercado(mercId){
-  const m=db.mercados.find(x=>String(x._id||x.id)===String(mercId));
-  if(!m){showToast('Mercado não encontrado','❌');return;}
-  mercadoLogado={...m,id:m._id||m.id,_id:m._id||m.id,nome:m.nome,icone:m.icone||'🏪',plano:m.plano||'',parceiro:m.parceiro||false,usuario:m.usuario||'(admin-preview)',_adminPreview:true};
-  portalTabAtiva='atualizar';irParaPortal();
-  setTimeout(()=>{const ex=document.getElementById('_adminPreviewBanner');if(ex)ex.remove();
-    const b=document.createElement('div');b.id='_adminPreviewBanner';
-    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#7C3AED;color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;';
-    b.innerHTML='👁️ PREVIEW ADMIN: <b>'+m.nome+'</b> — Plano: '+(m.plano||'Sem plano')+' — Tudo funciona como mercado real <button onclick="adminSairPreview()" style="background:rgba(255,255,255,.25);border:none;border-radius:8px;color:#fff;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:10px;">✕ Sair preview</button>';
-    document.body.prepend(b);},100);
-}
-function adminSairPreview(){
-  const b=document.getElementById('_adminPreviewBanner');if(b)b.remove();
-  mercadoLogado=null;irPara('admin');renderAdminForm();
-}
 function editarMercado(id){
   _mercadoEditandoId = id;
   renderAdminForm(); // rerenderiza a aba mostrando form de edição no topo
@@ -10893,18 +10897,12 @@ async function excluirPreco(produtoId, mercadoId){
 }
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
-async function reconstruirProdutosOrfaos(){
-  if(!confirm('Reconstruir produtos DELETADOS do banco?\n\nEssa operacao religa os precos existentes.\nProdutos recriados ficam com categoria Recuperado.')) return;
+async function autoRenomearRecuperados(){
+  if(!confirm('Tentar renomear automaticamente os produtos recuperados?\n\nO sistema vai cruzar os preços com o histórico de notas fiscais para descobrir os nomes originais.')) return;
   try {
-    showToast('Verificando produtos deletados...','⏳');
-    const diag = await apiReq('GET','/api/admin/diagnostico-orfaos');
-    if(!diag || !diag.totalOrfaos){
-      showToast('Nenhum produto deletado encontrado!','✅'); return;
-    }
-    if(!confirm('Encontrados '+diag.totalOrfaos+' produto(s) deletados com '+diag.precosOrfaos+' preco(s).\n\nReconstruir agora?')) return;
-    showToast('Reconstruindo...','⏳');
-    const res = await apiReq('POST','/api/admin/reconstruir-produtos-orfaos',{});
-    showToast(res.mensagem||'Reconstrucao concluida!','✅');
+    showToast('Buscando nomes originais...','⏳');
+    const res = await apiReq('POST','/api/admin/renomear-recuperados-auto',{});
+    showToast(res.mensagem || 'Concluido!','✅');
     await carregarDadosBackend();
     renderAdminForm();
   } catch(e){
@@ -10912,17 +10910,45 @@ async function reconstruirProdutosOrfaos(){
   }
 }
 
-async function reativarTodosProdutos(){
-  if(!confirm('Reativar TODOS os produtos que foram desativados?\n\nIsso recupera os produtos que aparecem como (removido).\nNenhum dado e apagado.')) return;
+async function renomearProdutoRecuperado(id, nomeEnc, emojiEnc, catEnc){
+  const nomeAtual = decodeURIComponent(nomeEnc);
+  const emojiAtual = decodeURIComponent(emojiEnc);
+  const catAtual = decodeURIComponent(catEnc);
+  const novoNome = prompt('Nome do produto:', nomeAtual);
+  if(!novoNome || !novoNome.trim()) return;
+  const novoEmoji = prompt('Emoji:', emojiAtual) || emojiAtual;
+  const catOpcoes = 'Alimentos, Bebidas, Hortifruti, Carnes, Laticinios, Padaria, Limpeza, Higiene, Congelados, Mercearia, Pet, Outros';
+  const novaCat = prompt('Categoria:\n'+catOpcoes, catAtual==='Recuperado'?'Alimentos':catAtual) || 'Alimentos';
   try {
-    showToast('Recuperando produtos...','⏳');
-    const res = await apiReq('POST','/api/admin/reativar-todos-produtos',{});
-    showToast(res.mensagem || (res.reativados+' produto(s) reativado(s)!'),'✅');
+    await apiReq('PUT', '/api/admin/produtos/'+id, { nome:novoNome.trim(), emoji:novoEmoji.trim(), categoria:novaCat.trim() });
+    showToast('Produto renomeado!','✅');
     await carregarDadosBackend();
     renderAdminForm();
-  } catch(e){
-    showToast('Erro: '+e.message,'❌');
-  }
+  } catch(e){ showToast('Erro: '+e.message,'❌'); }
+}
+
+async function reconstruirProdutosOrfaos(){
+  if(!confirm('Reconstruir produtos DELETADOS do banco?\n\nEssa operacao religa os precos existentes.')) return;
+  try {
+    showToast('Verificando...','⏳');
+    const diag = await apiReq('GET','/api/admin/diagnostico-orfaos');
+    if(!diag||!diag.totalOrfaos){ showToast('Nenhum produto deletado!','✅'); return; }
+    if(!confirm('Encontrados '+diag.totalOrfaos+' produto(s) com '+diag.precosOrfaos+' preco(s).\nReconstruir?')) return;
+    showToast('Reconstruindo...','⏳');
+    const res = await apiReq('POST','/api/admin/reconstruir-produtos-orfaos',{});
+    showToast(res.mensagem||'Concluido!','✅');
+    await carregarDadosBackend(); renderAdminForm();
+  } catch(e){ showToast('Erro: '+e.message,'❌'); }
+}
+
+async function reativarTodosProdutos(){
+  if(!confirm('Reativar TODOS os produtos desativados?\nIsso recupera produtos (removido).')) return;
+  try {
+    showToast('Recuperando...','⏳');
+    const res = await apiReq('POST','/api/admin/reativar-todos-produtos',{});
+    showToast(res.mensagem||(res.reativados+' reativado(s)!'),'✅');
+    await carregarDadosBackend(); renderAdminForm();
+  } catch(e){ showToast('Erro: '+e.message,'❌'); }
 }
 
 async function limparPrecosOrfaos(){

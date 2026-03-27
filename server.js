@@ -1520,20 +1520,135 @@ app.put('/api/admin/produtos/:id', adminAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
-// ── REATIVAR TODOS OS PRODUTOS (recuperação de emergência) ──
-app.post('/api/admin/reativar-todos-produtos', adminAuth, async (req, res) => {
+
+// ══════════════════════════════════════════════════════════════════
+// RECUPERAÇÃO DE PRODUTOS DELETADOS
+// ══════════════════════════════════════════════════════════════════
+
+// Diagnóstico: mostra quais produtoIds estão em Preco mas não em Produto
+app.get('/api/admin/diagnostico-orfaos', adminAuth, async (req, res) => {
   try {
-    // Reativa absolutamente todos os produtos inativados, independente de estarem no seed
-    const inativos = await Produto.countDocuments({ ativo: false });
-    const result = await Produto.updateMany({ ativo: false }, { $set: { ativo: true } });
+    const todosPrecos = await Preco.find({}, 'produtoId mercadoId preco');
+    const todosProdutosIds = new Set(
+      (await Produto.find({}, '_id')).map(p => String(p._id))
+    );
+    const orfaos = todosPrecos.filter(p => !todosProdutosIds.has(String(p.produtoId)));
+    const orfaosIds = [...new Set(orfaos.map(p => String(p.produtoId)))];
+    
+    // Para cada ID órfão, buscar nas contribuições
+    const contribs = await Contribuicao.find(
+      { produtoId: { $in: orfaosIds } },
+      'produtoId obs'
+    );
+    
+    // Agrupar contribuições por produtoId para tentar extrair nomes
+    const nomesPorId = {};
+    for (const ct of contribs) {
+      const id = String(ct.produtoId);
+      if (!nomesPorId[id] && ct.obs) {
+        // Tentar extrair nome do obs
+        const m = ct.obs.match(/produto[^a-z]{0,5}([a-zA-Z0-9 ]{3,60})/i);
+        if (m) nomesPorId[id] = m[1].trim();
+      }
+    }
+    
+    // Também buscar nos logs de produto solicitado
+    const logs = await Log.find(
+      { tipo: 'produto_solicitado', nomeProduto: { $exists: true, $ne: '' } }
+    );
+    for (const log of logs) {
+      // Logs de solicitação não têm o ObjectId do produto deletado
+      // mas servem de referência de nomes que existiam
+    }
+    
+    res.json({
+      totalPrecos: todosPrecos.length,
+      totalProdutosAtivos: todosProdutosIds.size,
+      totalOrfaos: orfaosIds.length,
+      precosOrfaos: orfaos.length,
+      idsOrfaos: orfaosIds,
+      nomesPorId,
+      mensagem: `${orfaosIds.length} produto(s) deletados com ${orfaos.length} preço(s) associados`
+    });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Reconstrução: recria os produtos deletados usando os IDs originais
+// Preserva os preços pois usa o mesmo ObjectId
+app.post('/api/admin/reconstruir-produtos-orfaos', adminAuth, async (req, res) => {
+  try {
+    const todosPrecos = await Preco.find({}, 'produtoId preco');
+    const todosProdutosIds = new Set(
+      (await Produto.find({}, '_id')).map(p => String(p._id))
+    );
+    const orfaosIds = [...new Set(
+      todosPrecos
+        .filter(p => !todosProdutosIds.has(String(p.produtoId)))
+        .map(p => String(p.produtoId))
+    )];
+    
+    if (!orfaosIds.length) {
+      return res.json({ ok: true, recriados: 0, mensagem: 'Nenhum produto órfão encontrado.' });
+    }
+    
+    // Tentar encontrar nomes nas contribuições
+    const contribs = await Contribuicao.find(
+      { produtoId: { $in: orfaosIds } },
+      'produtoId obs'
+    );
+    const nomesPorId = {};
+    for (const ct of contribs) {
+      const id = String(ct.produtoId);
+      if (!nomesPorId[id] && ct.obs) {
+        const m = ct.obs.match(/(?:produto|Produto)[^a-z]{0,5}([a-zA-Z0-9 ]{3,60})/);
+        if (m) nomesPorId[id] = m[1].trim();
+      }
+    }
+    
+    // Também buscar nos logs de solicitação de produto
+    const logsSol = await Log.find({ tipo: 'produto_solicitado', nomeProduto: { $exists: true } });
+    
+    // Recriar cada produto com o ID original
+    let recriados = 0;
+    const erros = [];
+    for (const idStr of orfaosIds) {
+      try {
+        const nome = nomesPorId[idStr] || `Produto ${idStr.slice(-6)}`;
+        const mongoose = require('mongoose');
+        const _id = new mongoose.Types.ObjectId(idStr);
+        await Produto.create({
+          _id,
+          nome,
+          emoji: '📦',
+          categoria: 'Recuperado',
+          ativo: true
+        });
+        recriados++;
+      } catch(e) {
+        erros.push({ id: idStr, erro: e.message });
+      }
+    }
+    
     await registrarLog('admin',
-      `Reativação emergência: ${result.modifiedCount} produto(s) reativado(s)`,
+      `Reconstrução: ${recriados} produto(s) recriados de ${orfaosIds.length} órfãos`,
       req.user.usuario, getIP(req));
+    
     res.json({
       ok: true,
-      reativados: result.modifiedCount,
-      mensagem: `✅ ${result.modifiedCount} produto(s) reativado(s) com sucesso!`
+      recriados,
+      erros: erros.length,
+      detalhesErros: erros.slice(0,5),
+      mensagem: `✅ ${recriados} produto(s) recriado(s)! Os preços estão reliGados.`
     });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Reativar todos produtos inativados
+app.post('/api/admin/reativar-todos-produtos', adminAuth, async (req, res) => {
+  try {
+    const result = await Produto.updateMany({ ativo: false }, { $set: { ativo: true } });
+    await registrarLog('admin', `Reativação: ${result.modifiedCount} produto(s) reativado(s)`, req.user.usuario, getIP(req));
+    res.json({ ok: true, reativados: result.modifiedCount, mensagem: `✅ ${result.modifiedCount} produto(s) reativado(s)!` });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
@@ -2560,24 +2675,19 @@ app.get('/api/fix-catalogo', async (req, res) => {
     // Pega nomes corretos do seed (versão atual)
     const nomesSeed = new Set(PRODUTOS_SEED.map(p => p.nome.toLowerCase().trim()));
 
-    // Remove produtos cujo nome NÃO está no seed E não tem preço cadastrado
-    // PROTEÇÃO: nunca remove produto que tem preço — pode ser produto manual válido
+    // Remove produtos fora do seed SÓ SE não tiverem preço cadastrado
     const todos = await Produto.find({}, 'nome _id');
+    const comPrecoIds = new Set((await Preco.distinct('produtoId')).map(String));
     const foraDoSeed = todos.filter(p => !nomesSeed.has(p.nome.toLowerCase().trim()));
-    // Verificar quais têm preço — esses NÃO podem ser removidos
-    const comPreco = await Preco.distinct('produtoId');
-    const comPrecoSet = new Set(comPreco.map(id => String(id)));
-    const parasRemover = foraDoSeed.filter(p => !comPrecoSet.has(String(p._id)));
+    const parasRemover = foraDoSeed.filter(p => !comPrecoIds.has(String(p._id)));
     let removidos = 0;
     if (parasRemover.length) {
       await Produto.deleteMany({ _id: { $in: parasRemover.map(p => p._id) } });
       removidos = parasRemover.length;
     }
-    // Reativar produtos fora do seed que têm preço (foram inativados indevidamente)
-    const inativosComPreco = foraDoSeed.filter(p => comPrecoSet.has(String(p._id)));
-    if (inativosComPreco.length) {
-      await Produto.updateMany({ _id: { $in: inativosComPreco.map(p => p._id) } }, { ativo: true });
-    }
+    // Reativar fora do seed que têm preço
+    const comPrecoFora = foraDoSeed.filter(p => comPrecoIds.has(String(p._id)));
+    if (comPrecoFora.length) await Produto.updateMany({ _id: { $in: comPrecoFora.map(p=>p._id) } }, { ativo:true });
 
     // Remove duplicatas — mantém apenas 1 de cada nome do seed
     for (const seedProd of PRODUTOS_SEED) {
@@ -2605,18 +2715,9 @@ app.post('/api/admin/limpar-duplicatas', adminAuth, async (req, res) => {
   try {
     let removidos = 0;
 
-    // PASSO 1: Salvar produtos com preço antes de apagar (proteção)
-    const comPrecoIds = new Set((await Preco.distinct('produtoId')).map(id => String(id)));
-    const produtosComPreco = await Produto.find({ _id: { $in: [...comPrecoIds] } });
-    // Apaga TUDO e reinsere o seed
+    // PASSO 1: Apaga TUDO e reinsere só o seed limpo
     await Produto.deleteMany({});
     const resultado = await Produto.insertMany(PRODUTOS_SEED, { ordered: false });
-    // Reinsere produtos manuais (fora do seed) que tinham preço cadastrado
-    const nomesSeedSet = new Set(PRODUTOS_SEED.map(p => p.nome.toLowerCase().trim()));
-    const manuaisComPreco = produtosComPreco.filter(p => !nomesSeedSet.has(p.nome.toLowerCase().trim()));
-    if (manuaisComPreco.length) {
-      await Produto.insertMany(manuaisComPreco.map(p => ({ nome:p.nome, emoji:p.emoji, categoria:p.categoria, ativo:true })), { ordered:false }).catch(()=>{});
-    }
     const total = await Produto.countDocuments({ ativo: true });
 
     await registrarLog('admin', `Limpeza catálogo: banco resetado com ${total} produtos do seed.`, req.user.usuario, getIP(req));

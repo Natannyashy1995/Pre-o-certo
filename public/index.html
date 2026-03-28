@@ -8115,15 +8115,21 @@ async function aprovarContrib(id){
   if(btn){ btn.disabled=true; btn.textContent='Aprovando...'; }
   try {
     await apiReq('PATCH','/api/contribuicoes/'+id+'/aprovar',{});
-    // Atualiza local para UI refletir sem recarregar
-    const c = db.contribuicoes.find(x=>String(x.id||x._id)===String(id));
-    if(c){
-      c.status='aprovado';
-      const idx=db.precos.findIndex(p=>String(p.produtoId)===String(c.produtoId)&&String(p.mercadoId)===String(c.mercadoId));
-      const entry={produtoId:c.produtoId,mercadoId:c.mercadoId,preco:c.preco,dataAtu:c.data,fonte:'cliente',autor:c.autor};
-      if(idx>=0)db.precos[idx]=entry; else db.precos.push(entry);
+    // Rejeitar duplicatas pendentes do mesmo produto+mercado
+    const aprovada = db.contribuicoes.find(x=>String(x.id||x._id)===String(id));
+    if(aprovada){
+      const dups = db.contribuicoes.filter(x=>
+        String(x.id||x._id) !== String(id) &&
+        x.status === 'pendente' &&
+        String(x.produtoId) === String(aprovada.produtoId) &&
+        String(x.mercadoId) === String(aprovada.mercadoId)
+      );
+      for(const dup of dups){
+        try{ await apiReq('PATCH','/api/contribuicoes/'+String(dup.id||dup._id)+'/rejeitar',{motivo:'Duplicata'}); }catch(_){}
+      }
     }
     showToast('Contribuição aprovada e publicada! ✅','✅');
+    await carregarDadosAdmin();
     renderAdminForm();
   } catch(e){
     showToast('Erro ao aprovar: '+e.message,'❌');

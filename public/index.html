@@ -1290,6 +1290,16 @@ function encontrarProdutoIA(nomeIA){
   const nomeExato = (nomeIA||'').trim().toLowerCase();
   const exato = db.produtos.find(p => (p.nome||'').trim().toLowerCase() === nomeExato);
   if(exato) return exato;
+  // Busca com expansão de abreviações do cupom fiscal
+  const nomeExpandido = (nomeIA||'').trim()
+    .replace(/\bbaunil\b/gi,'baunilha').replace(/\brech\b/gi,'recheado')
+    .replace(/\bcondensad\b/gi,'condensado').replace(/\bsemid\b/gi,'semidesnatado')
+    .replace(/\bguaran\b/gi,'guarana').replace(/\bsach\b/gi,'sache')
+    .replace(/\bmorang\b/gi,'morango').replace(/\bchocol\b/gi,'chocolate')
+    .replace(/\bapach\b/gi,'apache').toLowerCase();
+  const exatoExpandido = db.produtos.find(p => (p.nome||'').trim().toLowerCase() === nomeExpandido);
+  if(exato) return exato;
+  if(exatoExpandido) return exatoExpandido;
 
   // PASSO 0B: busca por nome com normalização de acentos
   const semAcento = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
@@ -1303,7 +1313,32 @@ function encontrarProdutoIA(nomeIA){
     .replace(/\b(\d+)\s*lt\b/gi, '$1l')
     .replace(/\b(\d+)\s*litros?\b/gi, '$1l')
     .replace(/\bund\b/gi,'un').replace(/\bunid\b/gi,'un');
-  const norm = s => normSyn((s||'').toLowerCase())
+  // Expansão de abreviações de cupom fiscal (nomes truncados ~18 chars)
+  const expandCupom = s => (s||'')
+    .replace(/\bbaunil\b/gi,'baunilha').replace(/\bbauni\b/gi,'baunilha')
+    .replace(/\bchocol\b/gi,'chocolate').replace(/\bchoc\b/gi,'chocolate')
+    .replace(/\bmorango\b/gi,'morango').replace(/\bmorang\b/gi,'morango')
+    .replace(/\brechead\b/gi,'recheado').replace(/\brech\b/gi,'recheado')
+    .replace(/\bcondensad\b/gi,'condensado').replace(/\bconden\b/gi,'condensado')
+    .replace(/\binteg\b/gi,'integral').replace(/\bintegr\b/gi,'integral')
+    .replace(/\bsemid\b/gi,'semidesnatado').replace(/\bsemides\b/gi,'semidesnatado')
+    .replace(/\bdesnat\b/gi,'desnatado')
+    .replace(/\bmaracuj\b/gi,'maracuja').replace(/\bmaracu\b/gi,'maracuja')
+    .replace(/\bstrawb\b/gi,'morango')
+    .replace(/\btropica\b/gi,'tropical')
+    .replace(/\borigina\b/gi,'original')
+    .replace(/\bnatural\b/gi,'natural')
+    .replace(/\btradiciona\b/gi,'tradicional').replace(/\btradici\b/gi,'tradicional')
+    .replace(/\bcreme\b/gi,'creme')
+    .replace(/\bvanilha\b/gi,'baunilha')
+    .replace(/\bmanja\b/gi,'manjericao').replace(/\bmanjeric\b/gi,'manjericao')
+    .replace(/\btomate\b/gi,'tomate')
+    .replace(/\bsach\b/gi,'sache').replace(/\bsache\b/gi,'sache')
+    .replace(/\bapach\b/gi,'apache')
+    .replace(/\bguaran\b/gi,'guarana')
+    .replace(/\brefres\b/gi,'refresco');
+
+  const norm = s => normSyn(expandCupom((s||'').toLowerCase()))
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^a-z0-9 ]/g,' ')
     .replace(/ +/g,' ').trim();
@@ -5573,14 +5608,9 @@ TIPO 2 — ETIQUETA DE BALANÇA (açougue, frios, hortifruti — produto vendido
   - Exemplo ERRADO: nome="Salsicha Perdigão 0.384kg", preco=5.37
 
 TIPO 3 — CUPOM FISCAL (linhas 01, 02, 03... com código de barras):
-  - Cada linha numerada (001, 002, 003...) = UM produto DIFERENTE — NUNCA agrupe linhas
-  - Nome = DESCRIÇÃO EXATA da linha, incluindo o sufixo (SALADA, GUARAN, MANGA, etc.)
-  - Produtos com mesmo preço e nome parecido = produtos DIFERENTES — preserve o nome COMPLETO de cada um
-  - Ex: REFRESCO MARATA SALADA, REFRESCO MARATA GUARAN, REFRESCO MARATA MANGA são 3 produtos distintos
-  - Preço = PENÚLTIMO número da linha (valor unitário VL UN)
+  - Nome = DESCRIÇÃO da linha; preço = PENÚLTIMO número (unitário)
   - Abrev: BOV=Bovina, LING=Linguiça, CERV=Cerveja, ARR=Arroz, PARB=Parboilizado
   - NÃO inclua: TOTAL, SUBTOTAL, DESCONTO, TROCO
-  - ⛔ NUNCA repita o mesmo nome para linhas diferentes — leia cada linha individualmente
 
 TIPO 4 — LISTA DE PREÇOS em quadro/banner (linhas com "........"):
   - "R" cortado pelo quadrado = número visível É o preço

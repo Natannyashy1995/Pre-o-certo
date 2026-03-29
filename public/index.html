@@ -10959,18 +10959,6 @@ async function reconstruirProdutosOrfaos(){
     showToast(res.mensagem||'Concluido!','✅');await carregarDadosBackend();renderAdminForm();
   }catch(e){showToast('Erro: '+e.message,'❌');}
 }
-async function limparProdutosSemNome(){
-  if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
-  const semNome=db.produtos.filter(p=>p.nome.match(/^Produto [a-f0-9]{6}$/i)||p.categoria==='Recuperado');
-  if(!semNome.length){showToast('Nenhum produto sem nome!','✅');return;}
-  if(!confirm('Deletar '+semNome.length+' produto(s) sem nome e todos os precos associados?\nEssa acao nao pode ser desfeita.'))return;
-  try{
-    showToast('Limpando...','⏳');
-    const res=await apiReq('POST','/api/admin/limpar-produtos-sem-nome',{});
-    showToast(res.mensagem||'Concluido!','✅');
-    await carregarDadosBackend();renderAdminForm();
-  }catch(e){showToast('Erro: '+e.message,'❌');}
-}
 async function reativarTodosProdutos(){
   if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
   showToast('Recuperando...','⏳');

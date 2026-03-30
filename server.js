@@ -1970,7 +1970,7 @@ app.patch('/api/contribuicoes/:id/rejeitar', adminAuth, async (req, res) => {
   try {
     const c = await Contribuicao.findByIdAndUpdate(req.params.id, { status:'rejeitado', motivoRecusa:req.body?.motivo||'' }, { new:true });
     if (!c) return res.status(404).json({ erro:'Não encontrada' });
-    if (c.clienteId) await Cliente.findByIdAndUpdate(c.clienteId, { $inc:{ contribuicoesRejeitadas:1, errosConsecutivos:1 } });
+    if (c.clienteId) await Cliente.findByIdAndUpdate(c.clienteId, { $inc:{ contribuicoesRejeitadas:1 } });
     res.json({ mensagem:'Rejeitado' });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });

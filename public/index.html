@@ -651,12 +651,12 @@ setTimeout(function(){hideSplash();
         </button>
       </div>
 
-    </div>
+      <!-- BANNER PATROCINADO -->
+      <div id="propagandaBanner" style="margin-top:14px;display:none;">
+        <div style="font-size:9px;color:#aaa;text-align:center;margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Patrocinado</div>
+        <div id="propagandaConteudo"></div>
+      </div>
 
-    <!-- BANNER PATROCINADO -->
-    <div id="propagandaBanner" style="padding:0 4px 24px;display:none;">
-      <div style="font-size:9px;color:#aaa;text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Patrocinado</div>
-      <div id="propagandaConteudo"></div>
     </div>
 
   </div>
@@ -1530,6 +1530,10 @@ async function carregarPropagandaAdmin(){
           '<input id="propImgInput" type="file" accept="image/*" onchange="previewPropImg(this)" style="font-size:12px;">'+
           '<div id="propImgPreview" style="margin-top:8px;display:none;"><img id="propImgThumb" style="width:100%;border-radius:8px;max-height:150px;object-fit:cover;"></div>'+
         '</div>'+
+        '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Tempo de exibição por anúncio (segundos)</div>'+
+        '<input id="propTempo" type="number" min="5" max="60" value="10" style="width:100%;padding:8px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;box-sizing:border-box;">'+
+        '<div style="font-size:10px;color:var(--muted);margin-top:3px;">⏱️ Com múltiplos anúncios, cada um aparece por esse tempo antes de trocar</div>'+
+        '</div>'+
         '<button onclick="salvarPropaganda()" style="width:100%;background:var(--azul);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">💾 Publicar Propaganda</button>'+
       '</div>'+
       '<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">'+props.length+' propaganda(s)</div>'+
@@ -1576,7 +1580,8 @@ async function salvarPropaganda(){
       canvas.getContext('2d').drawImage(img,0,0,w,h);
       const imagemUrl=canvas.toDataURL('image/jpeg',0.75);
       try{
-        await apiReq('POST','/api/admin/propagandas',{titulo,anunciante,linkUrl,imagemUrl,dataInicio:fmtDt(inicio),dataFim:fmtDt(fim)});
+        const tempo=parseInt(document.getElementById('propTempo')?.value||'10');
+        await apiReq('POST','/api/admin/propagandas',{titulo,anunciante,linkUrl,imagemUrl,dataInicio:fmtDt(inicio),dataFim:fmtDt(fim),tempoExibicao:tempo});
         showToast('Propaganda publicada! 📣','✅');
         carregarPropagandaAdmin();
       }catch(err){showToast('Erro: '+err.message,'❌');}
@@ -1607,60 +1612,29 @@ async function carregarPropagandaBanner(){
   try{
     const props=await apiReq('GET','/api/propaganda',null,false);
     if(!props||!props.length)return;
-    const p=props[Math.floor(Math.random()*props.length)];
-    const banner=document.getElementById('propagandaBanner');
-    const conteudo=document.getElementById('propagandaConteudo');
-    if(!banner||!conteudo)return;
-    conteudo.innerHTML=p.linkUrl
-      ?'<a href="'+p.linkUrl+'" target="_blank" rel="noopener" style="display:block;"><img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--azul);text-align:center;margin-top:4px;">🔗 '+p.titulo+'</div></a>'
-      :'<img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;">'+p.titulo+'</div>';
-    banner.style.display='block';
+    if(props.length===1){
+      exibirPropaganda(props[0]);
+    } else {
+      let idxP=0;
+      const rodarP=()=>{
+        const p=props[idxP%props.length];
+        exibirPropaganda(p);
+        idxP++;
+        setTimeout(rodarP,(p.tempoExibicao||10)*1000);
+      };
+      rodarP();
+    }
   }catch(_){}
 }
 
-// ════════ FIM PROPAGANDA ════════
-async function chamarIA(prompt, imageBase64=null, mediaType='image/jpeg', timeoutMs=30000){
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    let res;
-    // Sempre usa JSON — mas garante que a imagem está comprimida antes de chegar aqui
-    const body = { prompt };
-    if(imageBase64){ body.imageBase64 = imageBase64; body.mediaType = mediaType || 'image/jpeg'; }
-    res = await fetch(API_URL + '/api/ia/analisar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    // Lê como texto primeiro para detectar erros HTML
-    const rawText = await res.text();
-    let data;
-    try { data = JSON.parse(rawText); } catch(pe) {
-      if(res.status === 413) throw new Error('Foto muito grande. Tente uma foto de menor resolução.');
-      if(res.status === 429) throw new Error('Muitas requisições. Aguarde 1 minuto.');
-      if(rawText.startsWith('<!') || rawText.startsWith('<html')) throw new Error('Servidor indisponível. Tente novamente.');
-      throw new Error('Erro do servidor (HTTP ' + res.status + ')');
-    }
-    if(!res.ok){
-      if(res.status === 429 || (data.erro && (data.erro.toLowerCase().includes('quota') || data.erro.toLowerCase().includes('limite')))){
-        throw new Error('Limite de uso da IA atingido. Aguarde alguns minutos e tente novamente, ou use a aba Manual.');
-      }
-      throw new Error(data.erro || 'Erro na IA');
-    }
-    return data.texto || '';
-  } catch(e) {
-    console.warn('IA erro:', e.message);
-    if(e.name === 'AbortError'){
-      throw new Error('IA demorou demais. Verifique sua conexão e tente novamente.');
-    }
-    if(e.message.includes('Load failed') || e.message.includes('Failed to fetch') || e.message.includes('NetworkError')){
-      throw new Error('Falha de conexão com o servidor. Verifique sua internet e tente novamente.');
-    }
-    throw new Error(e.message || 'Erro ao contactar a IA');
-  } finally {
-    clearTimeout(timeoutId);
-  }
+function exibirPropaganda(p){
+  const banner=document.getElementById('propagandaBanner');
+  const conteudo=document.getElementById('propagandaConteudo');
+  if(!banner||!conteudo)return;
+  conteudo.innerHTML=p.linkUrl
+    ?'<a href="'+p.linkUrl+'" target="_blank" rel="noopener" style="display:block;"><img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--azul);text-align:center;margin-top:4px;">🔗 '+p.titulo+'</div></a>'
+    :'<img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;">'+p.titulo+'</div>';
+  banner.style.display='block';
 }
 
 // Versão admin — usa endpoint exclusivo sem compartilhar limite com clientes

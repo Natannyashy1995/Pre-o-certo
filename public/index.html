@@ -3732,48 +3732,33 @@ function ativarMonitorOffline(sessaoId, dadosCliente){
 function abrirLocalizacaoMercado(mercadoId){
   const merc=db.mercados.find(m=>String(m._id||m.id)===String(mercadoId));
   if(!merc){showToast('Mercado não encontrado','⚠️');return;}
-  const cidade = config.cidade || '';
-  const estado = config.estado || '';
-  const nomeCompleto = `${merc.nome}, ${merc.endereco||''}, ${merc.bairro||''}, ${cidade}, ${estado}`.replace(/,\s*,/g,',').replace(/,\s*$/,'');
-  const busca = encodeURIComponent(nomeCompleto);
 
+  // Se tem coordenadas GPS — abre rota direta
   if(merc.lat && merc.lng){
-    // Tem coordenadas — usa direto
-    const destino=`${merc.lat},${merc.lng}`;
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(
-        pos=>{
-          const orig=`${pos.coords.latitude},${pos.coords.longitude}`;
-          window.open(`https://www.google.com/maps/dir/${orig}/${destino}`,'_blank');
-        },
-        ()=>{
-          window.open(`https://www.google.com/maps/search/${busca}/@${merc.lat},${merc.lng},17z`,'_blank');
-        },
-        {timeout:5000}
-      );
-    } else {
-      window.open(`https://www.google.com/maps/search/${busca}/@${merc.lat},${merc.lng},17z`,'_blank');
-    }
-  } else {
-    // Sem coordenadas — busca por nome e endereço
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(
-        pos=>{
-          const orig=`${pos.coords.latitude},${pos.coords.longitude}`;
-          window.open(`https://www.google.com/maps/dir/${orig}/${busca}`,'_blank');
-        },
-        ()=>{
-          window.open(`https://www.google.com/maps/search/${busca}`,'_blank');
-        },
-        {timeout:5000}
-      );
-    } else {
-      window.open(`https://www.google.com/maps/search/${busca}`,'_blank');
-    }
+    window.open('https://www.google.com/maps/dir/?api=1&destination='+merc.lat+','+merc.lng,'_blank');
+    return;
   }
+
+  // Sem coordenadas — monta busca inteligente
+  // O endereço já pode vir completo (ex: "Rua X, 123 - Bairro, Cidade - UF, CEP")
+  // Evitar duplicar cidade/bairro se já estão no endereço
+  const end = (merc.endereco||'').trim();
+  const cidade = config.cidade || 'Piatã';
+  const estado = config.estado || 'BA';
+
+  let query;
+  if(end && (end.toLowerCase().includes(cidade.toLowerCase()) || end.includes('-'))){
+    // Endereço já contém cidade/estado — usa só nome + endereço
+    query = merc.nome + ', ' + end;
+  } else {
+    // Endereço simples — adiciona cidade e estado
+    const partes = [merc.nome, end, merc.bairro||'', cidade, estado].filter(Boolean);
+    query = partes.join(', ').replace(/,\s*,/g,',').replace(/,\s*$/,'');
+  }
+
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query),'_blank');
 }
 
-// ===== SUPORTE NO ADMIN - CHAT MANAGER =====
 function renderAdminChats(){
   const chats = db.suporteChats.filter(s => s.mensagens && s.mensagens.length > 0);
   if(!chats.length)

@@ -1656,6 +1656,11 @@ function exibirPropaganda(p){
 }
 
 // Versão admin — usa endpoint exclusivo sem compartilhar limite com clientes
+// Alias para compatibilidade — chamarIA usa o mesmo endpoint
+async function chamarIA(prompt, imageBase64=null, mediaType='image/jpeg', timeoutMs=45000){
+  return chamarIAAdmin(prompt, imageBase64, mediaType);
+}
+
 async function chamarIAAdmin(prompt, imageBase64=null, mediaType='image/jpeg'){
   try {
     const body = { prompt };
@@ -3105,7 +3110,8 @@ const botRespostas = [
 
   // PROPAGANDA / PATROCÍNIO
   [['propaganda','patrocinio','patrocínio','anuncio','anúncio','anunciar','publicidade','banner','anunciante','quero anunciar','divulgar meu negocio','divulgar minha empresa','aparecer no app','quero aparecer'],
-   '📣 Quer anunciar no PreçoCerto?\n\nSeu anúncio aparece na tela inicial do app para todos os usuários de Piatã!\n\n💬 Fale conosco pelo botão de chat (💬 no canto inferior direito da tela) e envie:\n• Logo ou imagem do seu negócio\n• Link do site, Instagram ou WhatsApp\n• Período desejado\n\nDefinimos juntos o valor e a duração! 🤝'],
+   '__PROPAGANDA_CONTATO__'],
+
 
   // CONTRIBUIÇÃO / ENVIAR PREÇO
   [['contribu','enviar preco','enviar preço','mandar preco','mandar preço','atualizar preco','atualizar preço','foto ia','foto nota','nota fiscal','qr code','qr nota','escanear'],
@@ -3294,6 +3300,24 @@ async function enviarMsgChat(){
     }
 
     if(resposta){
+      if(resposta === '__PROPAGANDA_CONTATO__'){
+        if(!clienteLogado){
+          adicionarMsgChat('bot',
+            '📣 Quer anunciar no PreçoCerto?\n\n'+
+            'Para falar com nossa equipe, primeiro faça login ou crie uma conta grátis!\n\n'+
+            'Com sua conta, você fala direto com o nosso atendente. 👇'
+          );
+          setTimeout(()=>{
+            adicionarMsgChat('bot', '👤 Acesse ➕ Criar Conta ou faça login no botão Entrar.');
+          }, 1000);
+        } else {
+          adicionarMsgChat('bot',
+            '📣 Ótimo! Vou te conectar com nossa equipe para falar sobre anúncio!\n\nAguarde um momento...'
+          );
+          setTimeout(()=>escalarParaHumano(), 1200);
+        }
+        return;
+      }
       if(resposta === '__IOS_TUTORIAL__'){
         adicionarMsgChat('bot',
           '🍎 Usando iPhone? Sem problema!\n\n'+
@@ -3314,7 +3338,9 @@ async function enviarMsgChat(){
           );
         }, 900 + 4*1200 + 600);
       } else {
-        adicionarMsgChat('bot', resposta);
+        // Suporte a resposta dinâmica (função)
+        const txt = typeof resposta === 'function' ? resposta() : resposta;
+        adicionarMsgChat('bot', txt);
       }
       return;
     }
@@ -5768,22 +5794,17 @@ async function analisarFotoComIA(){
     // iOS falha com "Load failed" quando body JSON passa ~1.5MB
     // Compressão simples e confiável para iOS — carrega imagem UMA vez e reduz até < 700KB
     // Comprime imagem para < 400KB — limite seguro para iOS PWA via JSON
+    // Envia foto sem compressão — o servidor (Gemini) aguenta fotos grandes
+    // Apenas converte para base64 mantendo qualidade original
     const dataUrlFinal = await new Promise(res => {
       const img = new Image();
       img.onload = () => {
-        // Reduz progressivamente até caber em 400KB
-        const tentativas = [{max:1000,q:0.80},{max:750,q:0.72},{max:550,q:0.65},{max:400,q:0.58}];
-        let resultado = null;
-        for(const {max,q} of tentativas){
-          let w=img.width, h=img.height;
-          if(w>max||h>max){const r=Math.min(max/w,max/h);w=Math.round(w*r);h=Math.round(h*r);}
-          const c=document.createElement('canvas'); c.width=w; c.height=h;
-          c.getContext('2d').drawImage(img,0,0,w,h);
-          resultado = c.toDataURL('image/jpeg', q);
-          const kb = Math.round((resultado.split(',')[1]||'').length*0.75/1024);
-          console.log('[Foto IA] tentativa '+max+'px q'+q+':', kb+'KB');
-          if(kb < 400) break;
-        }
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const resultado = canvas.toDataURL('image/jpeg', 0.92);
+        const kb = Math.round((resultado.split(',')[1]||'').length*0.75/1024);
+        console.log('[Foto IA] enviando:', kb+'KB');
         res(resultado);
       };
       img.onerror = () => { console.warn('[Foto IA] img error, usando original'); res(fotoDataUrl); };
@@ -5792,7 +5813,6 @@ async function analisarFotoComIA(){
     const base64Data = dataUrlFinal ? dataUrlFinal.split(',')[1] : null;
     const mediaType = 'image/jpeg';
     if(!base64Data){ console.error('[Foto IA] base64Data vazio!'); }
-    console.log('[Foto IA] enviando:', base64Data ? Math.round(base64Data.length*0.75/1024)+'KB' : 'VAZIO');
 
     const mercadosList = db.mercados.map(m=>`${m.icone||'🏪'} ${m.nome}`).join(', ') || 'nenhum';
     const prompt = montarPromptFotoIA(1, mercadosList);

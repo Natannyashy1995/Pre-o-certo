@@ -1608,10 +1608,15 @@ async function deletarPropaganda(id,nome){
   }catch(e){showToast('Erro: '+e.message,'❌');}
 }
 
-async function carregarPropagandaBanner(){
+async function carregarPropagandaBanner(tentativa){
+  tentativa = tentativa||1;
   try{
     const props=await apiReq('GET','/api/propaganda',null,false);
-    if(!props||!props.length)return;
+    if(!props||!props.length){
+      // Retry após 8s — servidor pode ainda estar acordando
+      if(tentativa<3) setTimeout(()=>carregarPropagandaBanner(tentativa+1),8000);
+      return;
+    }
     if(props.length===1){
       exibirPropaganda(props[0]);
     } else {
@@ -1624,7 +1629,10 @@ async function carregarPropagandaBanner(){
       };
       rodarP();
     }
-  }catch(_){}
+  }catch(_){
+    // Retry em caso de falha (cold start do Render)
+    if((tentativa||1)<3) setTimeout(()=>carregarPropagandaBanner((tentativa||1)+1),8000);
+  }
 }
 
 function exibirPropaganda(p){
@@ -11540,6 +11548,8 @@ async function inicializarApp(){
 
   limparToken();
   hideSplash();
+  // Carregar banner de propaganda (não bloqueia o app)
+  carregarPropagandaBanner();
 }
 
 // ── WEB PUSH ─────────────────────────────────────────────

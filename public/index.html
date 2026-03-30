@@ -514,7 +514,8 @@ function splashMsg(msg){
 setTimeout(function(){splashMsg('Sincronizando dados...');},3000);
 setTimeout(function(){splashMsg('Aguardando servidor...');},6000);
 setTimeout(function(){splashMsg('O servidor pode estar iniciando...');},11000);
-setTimeout(function(){hideSplash();},20000);
+setTimeout(function(){hideSplash();
+  carregarPropagandaBanner();},20000);
 </script>
 
 <!-- TOAST -->
@@ -650,7 +651,12 @@ setTimeout(function(){hideSplash();},20000);
         </button>
       </div>
 
+    </div>
 
+    <!-- BANNER PATROCINADO -->
+    <div id="propagandaBanner" style="padding:0 4px 24px;display:none;">
+      <div style="font-size:9px;color:#aaa;text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Patrocinado</div>
+      <div id="propagandaConteudo"></div>
     </div>
 
   </div>
@@ -961,6 +967,7 @@ setTimeout(function(){hideSplash();},20000);
     <div class="tab" onclick="mudarTab('produto')" id="tabProduto">🥫 Produto <span id="badgeSolicProduto" style="display:none;background:#F59E0B;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:2px;">!</span></div>
     <div class="tab" onclick="mudarTab('mercado')">🏪 Mercado</div>
     <div class="tab" onclick="mudarTab('promocoes')">🔥 Promoções</div>
+    <div class="tab" onclick="mudarTab('propaganda')">📣 Propaganda</div>
     <div class="tab" onclick="mudarTab('planos_config')">💎 Planos</div>
     <div class="tab" onclick="mudarTab('solicitacoes')">📋 Solic.</div>
     <div class="tab" onclick="mudarTab('usuarios')">👥 Usuários</div>
@@ -1477,6 +1484,141 @@ function encontrarProdutoIA(nomeIA){
   return melhor;
 }
 
+
+// ════════ PROPAGANDA / PATROCÍNIO ════════
+
+async function carregarPropagandaAdmin(){
+  const form=document.getElementById('adminForm');
+  form.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">⏳ Carregando...</div>';
+  try{
+    const props=await apiReq('GET','/api/admin/propagandas');
+    const parseDt=d=>{if(!d)return 0;const[dd,mm,aa]=d.split('/');return new Date(aa,mm-1,dd).getTime();};
+    let lista='';
+    for(const p of props){
+      const vencida=Date.now()>parseDt(p.dataFim)+86400000;
+      const vigente=!vencida&&parseDt(p.dataInicio)<=Date.now();
+      const status=vencida?'🔴 Vencida':vigente?'🟢 No ar':'🟡 Agendada';
+      const cor=vencida?'#FCA5A5':vigente?'#BBF7D0':'var(--borda)';
+      lista+='<div style="background:var(--card2);border-radius:12px;padding:12px;margin-bottom:10px;border:1.5px solid '+cor+';">'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
+          '<img src="'+p.imagemUrl+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;">'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-size:13px;font-weight:700;">'+p.titulo+'</div>'+
+            '<div style="font-size:11px;color:var(--muted);">'+(p.anunciante||'')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);">'+p.dataInicio+' → '+p.dataFim+' • '+status+'</div>'+
+          '</div>'+
+        '</div>'+
+        (p.linkUrl?'<div style="font-size:11px;color:var(--azul);margin-bottom:8px;word-break:break-all;">🔗 '+p.linkUrl+'</div>':'')+
+        '<div style="display:flex;gap:6px;">'+
+          '<button onclick="togglePropaganda(\''+p._id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--borda);background:'+(p.ativa?'#FEF2F2':'#F0FDF4')+';color:'+(p.ativa?'var(--vermelho)':'var(--verde)')+';border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">'+(p.ativa?'⏸ Pausar':'▶️ Ativar')+'</button>'+
+          '<button onclick="deletarPropaganda(\''+p._id+'\',\''+p.titulo.replace(/'/g,"\\'")+'\')" style="flex:1;padding:8px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:var(--vermelho);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Excluir</button>'+
+        '</div>'+
+      '</div>';
+    }
+    form.innerHTML=
+      '<div style="font-family:var(--font-title);font-size:16px;font-weight:800;margin-bottom:12px;">📣 Propagandas & Patrocínios</div>'+
+      '<div style="background:var(--card2);border-radius:14px;padding:14px;margin-bottom:16px;">'+
+        '<div style="font-size:13px;font-weight:700;margin-bottom:10px;">➕ Nova Propaganda</div>'+
+        '<input id="propTitulo" placeholder="Nome do anunciante" style="width:100%;padding:10px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">'+
+        '<input id="propAnunciante" placeholder="Empresa / Contato" style="width:100%;padding:10px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">'+
+        '<input id="propLink" placeholder="Link (site, Instagram, WhatsApp — opcional)" style="width:100%;padding:10px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">'+
+        '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+          '<div style="flex:1;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Início</div><input id="propInicio" type="date" style="width:100%;padding:8px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;box-sizing:border-box;"></div>'+
+          '<div style="flex:1;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Validade</div><input id="propFim" type="date" style="width:100%;padding:8px;border:1.5px solid var(--borda);border-radius:8px;font-size:13px;box-sizing:border-box;"></div>'+
+        '</div>'+
+        '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Imagem do anúncio</div>'+
+          '<input id="propImgInput" type="file" accept="image/*" onchange="previewPropImg(this)" style="font-size:12px;">'+
+          '<div id="propImgPreview" style="margin-top:8px;display:none;"><img id="propImgThumb" style="width:100%;border-radius:8px;max-height:150px;object-fit:cover;"></div>'+
+        '</div>'+
+        '<button onclick="salvarPropaganda()" style="width:100%;background:var(--azul);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">💾 Publicar Propaganda</button>'+
+      '</div>'+
+      '<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">'+props.length+' propaganda(s)</div>'+
+      lista;
+    const hj=new Date();
+    const el=document.getElementById('propInicio');
+    if(el) el.value=hj.toISOString().slice(0,10);
+    const el2=document.getElementById('propFim');
+    if(el2){const f=new Date(hj);f.setDate(f.getDate()+30);el2.value=f.toISOString().slice(0,10);}
+  }catch(e){form.innerHTML='<div style="color:var(--vermelho);padding:20px;">Erro: '+e.message+'</div>';}
+}
+
+function previewPropImg(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=document.getElementById('propImgThumb');
+    const prev=document.getElementById('propImgPreview');
+    if(img)img.src=e.target.result;
+    if(prev)prev.style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function salvarPropaganda(){
+  const titulo=(document.getElementById('propTitulo')||{}).value?.trim();
+  const anunciante=(document.getElementById('propAnunciante')||{}).value?.trim()||'';
+  const linkUrl=(document.getElementById('propLink')||{}).value?.trim()||'';
+  const inicio=(document.getElementById('propInicio')||{}).value;
+  const fim=(document.getElementById('propFim')||{}).value;
+  const imgInput=document.getElementById('propImgInput');
+  if(!titulo||!inicio||!fim){showToast('Preencha título, início e validade','⚠️');return;}
+  if(!imgInput||!imgInput.files[0]){showToast('Selecione uma imagem','⚠️');return;}
+  if(new Date(fim)<new Date(inicio)){showToast('Validade deve ser após o início','⚠️');return;}
+  const fmtDt=d=>{const dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('pt-BR');};
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const img=new Image();
+    img.onload=async()=>{
+      const canvas=document.createElement('canvas');
+      const max=800;let w=img.width,h=img.height;
+      if(w>max||h>max){const r=Math.min(max/w,max/h);w=Math.round(w*r);h=Math.round(h*r);}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const imagemUrl=canvas.toDataURL('image/jpeg',0.75);
+      try{
+        await apiReq('POST','/api/admin/propagandas',{titulo,anunciante,linkUrl,imagemUrl,dataInicio:fmtDt(inicio),dataFim:fmtDt(fim)});
+        showToast('Propaganda publicada! 📣','✅');
+        carregarPropagandaAdmin();
+      }catch(err){showToast('Erro: '+err.message,'❌');}
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(imgInput.files[0]);
+}
+
+async function togglePropaganda(id){
+  try{
+    const r=await apiReq('PATCH','/api/admin/propagandas/'+id+'/toggle',{});
+    showToast(r.ativa?'Ativada!':'Pausada!','✅');
+    carregarPropagandaAdmin();
+  }catch(e){showToast('Erro: '+e.message,'❌');}
+}
+
+async function deletarPropaganda(id,nome){
+  if(!confirm('Excluir a propaganda "'+nome+'"?'))return;
+  try{
+    await apiReq('DELETE','/api/admin/propagandas/'+id);
+    showToast('Excluída','✅');
+    carregarPropagandaAdmin();
+  }catch(e){showToast('Erro: '+e.message,'❌');}
+}
+
+async function carregarPropagandaBanner(){
+  try{
+    const props=await apiReq('GET','/api/propaganda',null,false);
+    if(!props||!props.length)return;
+    const p=props[Math.floor(Math.random()*props.length)];
+    const banner=document.getElementById('propagandaBanner');
+    const conteudo=document.getElementById('propagandaConteudo');
+    if(!banner||!conteudo)return;
+    conteudo.innerHTML=p.linkUrl
+      ?'<a href="'+p.linkUrl+'" target="_blank" rel="noopener" style="display:block;"><img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--azul);text-align:center;margin-top:4px;">🔗 '+p.titulo+'</div></a>'
+      :'<img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;">'+p.titulo+'</div>';
+    banner.style.display='block';
+  }catch(_){}
+}
+
+// ════════ FIM PROPAGANDA ════════
 async function chamarIA(prompt, imageBase64=null, mediaType='image/jpeg', timeoutMs=30000){
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -2969,9 +3111,21 @@ const botRespostas = [
   [['android','chrome android','adicionar tela android','instalar android','como instalar android'],
    'No Android é simples! 🤖\n\n1️⃣ Abra o Chrome e acesse o app\n2️⃣ Toque nos 3 pontinhos (⋮) no canto superior direito\n3️⃣ Toque em "Adicionar à tela inicial"\n4️⃣ Confirme tocando em Adicionar\n\n✅ O ícone aparece na tela inicial como um app!'],
 
+  // PROPAGANDA / PATROCÍNIO
+  [['propaganda','patrocinio','patrocínio','anuncio','anúncio','anunciar','publicidade','banner','anunciante','quero anunciar','divulgar meu negocio','divulgar minha empresa','aparecer no app','quero aparecer'],
+   '📣 Quer anunciar no PreçoCerto?\n\nSeu anúncio aparece na tela de entrada do app para todos os usuários de Piatã!\n\n💰 Entre em contato conosco pelo Suporte (botão ao lado) e envie:\n• Logo ou imagem do seu negócio\n• Link do site, Instagram ou WhatsApp\n• Período desejado\n\nDefinimos juntos o valor e a duração! 🤝'],
+
+  // CONTRIBUIÇÃO / ENVIAR PREÇO
+  [['contribu','enviar preco','enviar preço','mandar preco','mandar preço','atualizar preco','atualizar preço','foto ia','foto nota','nota fiscal','qr code','qr nota','escanear'],
+   '📸 Contribuir com preços é fácil!\n\nVá em ➕ Contribuir e escolha:\n• 📷 Foto IA — tire foto da etiqueta ou prateleira\n• 📱 QR Nota — escaneie o QR da nota fiscal\n• ✏️ Manual — digite o produto e preço\n\nSua contribuição vai para análise e aparece no app em minutos! 🙌'],
+
+  // VER ROTA / LOCALIZAÇÃO
+  [['rota','localizacao','localização','onde fica','como chegar','mapa','maps','endereco','endereço','ver no mapa'],
+   '📍 Para ver a localização de um mercado:\n\n1️⃣ Toque em qualquer preço na home\n2️⃣ Veja o card do mercado\n3️⃣ Toque em 📍 Ver no mapa\n\nAbre o Google Maps direto com o endereço do mercado! 🗺️'],
+
   // AJUDA GENÉRICA
   [['ajuda','ajud','socorro','help','preciso de ajuda','o que voce faz','o que você faz'],
-   'Claro! Posso ajudar com:\n🏷️ Preços e produtos\n📸 Como contribuir\n👤 Conta e login\n🗺️ Mercados e mapa\n🔥 Promoções e planos\n📱 Usar no iPhone\n🐛 Reportar bugs\n\nDigite sua dúvida ou toque em "falar com atendente"! 🙋'],
+   'Claro! Posso ajudar com:\n🏷️ Preços e produtos\n📸 Como contribuir\n👤 Conta e login\n🗺️ Mercados e mapa\n🔥 Promoções e planos\n📣 Anunciar no app\n📱 Usar no iPhone\n🐛 Reportar bugs\n\nDigite sua dúvida ou toque em "falar com atendente"! 🙋'],
 ];
 
 function abrirLightbox(src){
@@ -6708,6 +6862,10 @@ function renderAdminForm(){
   const form=document.getElementById('adminForm');
 
   // ===== VISÃO GERAL =====
+  if(tabAtiva==='propaganda'){
+    carregarPropagandaAdmin();
+    return;
+  }
   if(tabAtiva==='visao_geral'){
     const totalPrecos=db.precos.length;
     const promosAtivas=db.promocoes.filter(p=>p.ativa).length;

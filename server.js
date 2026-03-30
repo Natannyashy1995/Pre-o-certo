@@ -2618,7 +2618,8 @@ const PropagandaSchema = new mongoose.Schema({
   ativa:      { type: Boolean, default: true },
   dataInicio: { type: String, required: true },
   dataFim:    { type: String, required: true },  // validade
-  criadoPor:  { type: String, default: 'admin' },
+  criadoPor:    { type: String, default: 'admin' },
+  tempoExibicao:{ type: Number, default: 10 }, // segundos por exibição
 }, { timestamps: true });
 const Propaganda = mongoose.model('Propaganda', PropagandaSchema);
 
@@ -3329,10 +3330,10 @@ app.get('/api/admin/propagandas', adminAuth, async (req, res) => {
 // Admin — criar
 app.post('/api/admin/propagandas', adminAuth, async (req, res) => {
   try {
-    const { titulo, imagemUrl, linkUrl, anunciante, dataInicio, dataFim } = req.body;
+    const { titulo, imagemUrl, linkUrl, anunciante, dataInicio, dataFim, tempoExibicao } = req.body;
     if (!titulo || !imagemUrl || !dataInicio || !dataFim)
       return res.status(400).json({ erro: 'titulo, imagemUrl, dataInicio e dataFim são obrigatórios' });
-    const p = await Propaganda.create({ titulo, imagemUrl, linkUrl: linkUrl||'', anunciante: anunciante||'', dataInicio, dataFim, criadoPor: req.user.usuario });
+    const p = await Propaganda.create({ titulo, imagemUrl, linkUrl: linkUrl||'', anunciante: anunciante||'', dataInicio, dataFim, tempoExibicao: parseInt(tempoExibicao)||10, criadoPor: req.user.usuario });
     await registrarLog('admin', `Propaganda criada: ${titulo} (até ${dataFim})`, req.user.usuario, getIP(req));
     res.status(201).json(p);
   } catch(e) { res.status(500).json({ erro: e.message }); }

@@ -2610,6 +2610,19 @@ const NfceCacheSchema = new mongoose.Schema({
   itens:       { type: Array,  default: [] },
   consultadoEm:{ type: Date,   default: Date.now },
 }, { timestamps: false });
+const PropagandaSchema = new mongoose.Schema({
+  titulo:     { type: String, required: true },
+  imagemUrl:  { type: String, required: true }, // base64 data URL
+  linkUrl:    { type: String, default: '' },     // site, instagram, etc
+  anunciante: { type: String, default: '' },
+  ativa:      { type: Boolean, default: true },
+  dataInicio: { type: String, required: true },
+  dataFim:    { type: String, required: true },  // validade
+  criadoPor:  { type: String, default: 'admin' },
+}, { timestamps: true });
+const Propaganda = mongoose.model('Propaganda', PropagandaSchema);
+
+
 const NfceCache = mongoose.model('NfceCache', NfceCacheSchema);
 
 app.post('/api/nfce/consultar', async (req, res) => {
@@ -3285,6 +3298,62 @@ app.post('/api/push/enviar', adminAuth, async (req, res) => {
     if (!titulo || !corpo) return res.status(400).json({ erro: 'titulo e corpo obrigatórios' });
     const total = await enviarPushParaClientes(titulo, corpo, url || '/');
     res.json({ ok: true, enviados: total });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+
+// ── PROPAGANDAS / PATROCÍNIO ─────────────────────────────────────
+// Pública — retorna propaganda ativa no período
+app.get('/api/propaganda', async (req, res) => {
+  try {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const props = await Propaganda.find({ ativa: true });
+    // Filtrar por data (formato DD/MM/AAAA)
+    const parseDt = d => { if(!d)return 0; const [dd,mm,aa]=d.split('/'); return new Date(aa,mm-1,dd).getTime(); };
+    const agora = Date.now();
+    const ativas = props.filter(p => {
+      const ini = parseDt(p.dataInicio);
+      const fim = parseDt(p.dataFim);
+      return ini <= agora && agora <= fim + 86400000;
+    });
+    res.json(ativas);
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Admin — listar todas
+app.get('/api/admin/propagandas', adminAuth, async (req, res) => {
+  try { res.json(await Propaganda.find().sort({ createdAt: -1 })); }
+  catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Admin — criar
+app.post('/api/admin/propagandas', adminAuth, async (req, res) => {
+  try {
+    const { titulo, imagemUrl, linkUrl, anunciante, dataInicio, dataFim } = req.body;
+    if (!titulo || !imagemUrl || !dataInicio || !dataFim)
+      return res.status(400).json({ erro: 'titulo, imagemUrl, dataInicio e dataFim são obrigatórios' });
+    const p = await Propaganda.create({ titulo, imagemUrl, linkUrl: linkUrl||'', anunciante: anunciante||'', dataInicio, dataFim, criadoPor: req.user.usuario });
+    await registrarLog('admin', `Propaganda criada: ${titulo} (até ${dataFim})`, req.user.usuario, getIP(req));
+    res.status(201).json(p);
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Admin — ativar/desativar
+app.patch('/api/admin/propagandas/:id/toggle', adminAuth, async (req, res) => {
+  try {
+    const p = await Propaganda.findById(req.params.id);
+    if (!p) return res.status(404).json({ erro: 'Não encontrada' });
+    p.ativa = !p.ativa;
+    await p.save();
+    res.json({ ativa: p.ativa });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
+// Admin — deletar
+app.delete('/api/admin/propagandas/:id', adminAuth, async (req, res) => {
+  try {
+    await Propaganda.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 

@@ -230,7 +230,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--texto);min-he
 .home-header{padding:calc(50px + var(--safe-top)) 20px 0;display:flex;align-items:center;gap:10px;}
 .admin-tag{background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);border-radius:100px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;color:#fff;}
 .user-avatar-btn{width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.5);cursor:pointer;overflow:hidden;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
-.home-hero{flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 20px 16px;}
+.home-hero{display:flex;flex-direction:column;justify-content:center;padding:20px 20px 16px;}
 .hero-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:100px;padding:6px 13px;font-size:12px;color:#fff;font-weight:700;margin-bottom:18px;width:fit-content;}
 .hero-tag::before{content:'';width:6px;height:6px;background:#7FEBA1;border-radius:50%;animation:pulse 2s infinite;}
 .hero-title{font-family:var(--font-title);font-size:34px;font-weight:900;color:#fff;line-height:1.1;margin-bottom:10px;}
@@ -820,6 +820,11 @@ setTimeout(function(){hideSplash();
   <div class="promo-home" id="promoHomeSection" style="display:none">
     <div class="promo-home-title">🔥 Promoções de hoje</div>
     <div class="promo-scroll" id="promoHomeScroll"></div>
+  </div>
+  <!-- BANNER PATROCINADO HOME -->
+  <div id="propagandaBannerHome" style="display:none;padding:16px 16px 8px;">
+    <div style="font-size:9px;color:#aaa;text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Patrocinado</div>
+    <div id="propagandaConteudoHome"></div>
   </div>
   <div class="floating-preview" id="floatingCards"></div>
 </div>
@@ -1636,13 +1641,18 @@ async function carregarPropagandaBanner(tentativa){
 }
 
 function exibirPropaganda(p){
-  const banner=document.getElementById('propagandaBanner');
-  const conteudo=document.getElementById('propagandaConteudo');
-  if(!banner||!conteudo)return;
-  conteudo.innerHTML=p.linkUrl
+  // Reutiliza a mesma função para login e home
+  const html = p.linkUrl
     ?'<a href="'+p.linkUrl+'" target="_blank" rel="noopener" style="display:block;"><img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--azul);text-align:center;margin-top:4px;">🔗 '+p.titulo+'</div></a>'
     :'<img src="'+p.imagemUrl+'" style="width:100%;border-radius:10px;display:block;"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;">'+p.titulo+'</div>';
-  banner.style.display='block';
+  // Banner da tela de login
+  const bannerLogin=document.getElementById('propagandaBanner');
+  const conteudoLogin=document.getElementById('propagandaConteudo');
+  if(bannerLogin&&conteudoLogin){conteudoLogin.innerHTML=html;bannerLogin.style.display='block';}
+  // Banner da home
+  const bannerHome=document.getElementById('propagandaBannerHome');
+  const conteudoHome=document.getElementById('propagandaConteudoHome');
+  if(bannerHome&&conteudoHome){conteudoHome.innerHTML=html;bannerHome.style.display='block';}
 }
 
 // Versão admin — usa endpoint exclusivo sem compartilhar limite com clientes

@@ -7132,42 +7132,12 @@ function renderAdminForm(){
     // Subtabs: manual | foto_ia | qr
     const prodSubTab = window._prodSubTab || 'manual';
 
-    if(prodSubTab==='recuperados'){
-      const prodsRec = db.produtos.filter(p=>p.categoria==='Recuperado');
-      let htmlRec = '<div style="display:flex;gap:6px;background:var(--card2);border-radius:12px;padding:5px;margin-bottom:12px;">' +
-        '<button onclick="setProdSubTab(\'manual\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">✏️ Manual</button>' +
-        '<button onclick="setProdSubTab(\'foto_ia\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">📷 Foto IA</button>' +
-        '<button onclick="setProdSubTab(\'qr\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);">📱 QR Nota</button>' +
-        '<button onclick="setProdSubTab(\'recuperados\')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;background:#EF4444;color:#fff;">🔧 ('+prodsRec.length+')</button>' +
-      '</div>';
-      if(!prodsRec.length){
-        htmlRec += '<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">✅ Nenhum produto pendente!</div>';
-      } else {
-        htmlRec += '<div style="display:flex;align-items:center;gap:8px;background:#FEF3C7;border-radius:8px;padding:8px 10px;margin-bottom:8px;">' +
-          '<div style="flex:1;font-size:12px;color:#B45309;font-weight:600;">'+prodsRec.length+' produto(s) aguardando</div>' +
-          '<button onclick="autoRenomearRecuperados()" style="background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🤖 Auto-Renomear</button>' +
-        '</div>';
-        htmlRec += prodsRec.map(function(p){
-          return '<div style="background:#fff;border:1.5px solid #FCA5A5;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-            '<span style="font-size:20px;">'+(p.emoji||'📦')+'</span>' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#7F1D1D;">'+(p.nome||'')+'</div>' +
-            '<div style="font-size:10px;color:var(--muted);">ID: '+String(p._id||p.id).slice(-8)+'</div></div>' +
-            '<button onclick="renomearProdutoRecuperado(\''+String(p._id||p.id)+'\',\''+encodeURIComponent(p.nome||'')+'\',\''+encodeURIComponent(p.emoji||'📦')+'\',\''+encodeURIComponent(p.categoria||'Recuperado')+'\')" ' +
-            'style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ Renomear</button>' +
-          '</div>';
-        }).join('');
-      }
-      form.innerHTML = htmlRec;
-      return;
-    }
-
     form.innerHTML=`
       <!-- SUBTABS -->
       <div style="display:flex;gap:6px;background:var(--card2);border-radius:12px;padding:5px;">
         <button onclick="setProdSubTab('manual')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='manual'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">✏️ Manual</button>
         <button onclick="setProdSubTab('foto_ia')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='foto_ia'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">📷 Foto IA</button>
         <button onclick="setProdSubTab('qr')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='qr'?'background:var(--azul);color:#fff;':'background:transparent;color:var(--muted);'}">📱 QR Nota</button>
-        <button onclick="setProdSubTab('recuperados')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;${prodSubTab==='recuperados'?'background:#EF4444;color:#fff;':'background:transparent;color:var(--muted);'}">${db.produtos.filter(p=>p.categoria==='Recuperado').length?'🔧 ('+db.produtos.filter(p=>p.categoria==='Recuperado').length+')':'🔧'}</button>
       </div>
 
       ${prodSubTab==='manual'?`
@@ -10968,19 +10938,6 @@ async function excluirPreco(produtoId, mercadoId){
 }
 
 // ─── LIMPAR PREÇOS ÓRFÃOS (produto deletado mas preço persiste) ──────────────
-async function autoRenomearRecuperados(){
-  if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
-  if(!confirm('Tentar renomear automaticamente?\nO sistema cruza os precos com historico da IA e notas fiscais.')) return;
-  try{showToast('Buscando nomes...','⏳');const res=await apiReq('POST','/api/admin/renomear-recuperados-auto',{});showToast(res.mensagem||'Concluido!','✅');await carregarDadosBackend();renderAdminForm();}catch(e){showToast('Erro: '+e.message,'❌');}
-}
-async function renomearProdutoRecuperado(id,nomeEnc,emojiEnc,catEnc){
-  if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
-  const novoNome=prompt('Nome do produto:',decodeURIComponent(nomeEnc));
-  if(!novoNome||!novoNome.trim())return;
-  const novoEmoji=prompt('Emoji:',decodeURIComponent(emojiEnc))||decodeURIComponent(emojiEnc);
-  const novaCat=prompt('Categoria (Alimentos/Bebidas/Limpeza/etc):',decodeURIComponent(catEnc)==='Recuperado'?'Alimentos':decodeURIComponent(catEnc))||'Alimentos';
-  try{await apiReq('PUT','/api/admin/produtos/'+id,{nome:novoNome.trim(),emoji:novoEmoji.trim(),categoria:novaCat.trim()});showToast('Renomeado!','✅');await carregarDadosBackend();renderAdminForm();}catch(e){showToast('Erro: '+e.message,'❌');}
-}
 async function reconstruirProdutosOrfaos(){
   if(!apiToken){showToast('Faca login novamente no admin','❌');return;}
   if(!confirm('Reconstruir produtos DELETADOS?\nReliga os precos existentes.'))return;

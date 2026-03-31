@@ -1656,9 +1656,31 @@ function exibirPropaganda(p){
 }
 
 // Versão admin — usa endpoint exclusivo sem compartilhar limite com clientes
-// Alias para compatibilidade — chamarIA usa o mesmo endpoint
+// chamarIA — endpoint público, usado pelo cliente (sem auth de admin)
 async function chamarIA(prompt, imageBase64=null, mediaType='image/jpeg', timeoutMs=45000){
-  return chamarIAAdmin(prompt, imageBase64, mediaType);
+  try {
+    const body = { prompt };
+    if(imageBase64){ body.imageBase64 = imageBase64; body.mediaType = mediaType; }
+    const res = await fetch(API_URL + '/api/ia/analisar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const rawText = await res.text();
+    let data;
+    try { data = JSON.parse(rawText); } catch(pe) {
+      if(res.status === 413) throw new Error('Foto muito grande.');
+      if(rawText.startsWith('<!')) throw new Error('Servidor indisponível.');
+      throw new Error('Erro do servidor (HTTP ' + res.status + ')');
+    }
+    if(!res.ok) throw new Error(data.erro || 'Erro na IA');
+    return data.texto || '';
+  } catch(e) {
+    if(e.message.includes('fetch') || e.message.includes('Failed') || e.message.includes('NetworkError')){
+      throw new Error('Sem conexão com o servidor. Verifique sua internet.');
+    }
+    throw new Error(e.message || 'Erro ao contactar a IA');
+  }
 }
 
 async function chamarIAAdmin(prompt, imageBase64=null, mediaType='image/jpeg'){

@@ -628,8 +628,8 @@ setTimeout(function(){hideSplash();
 
       <!-- LOGIN FORM -->
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
-        <div class="lf"><span class="lf-ic">👤</span><input type="text" id="loginClienteUser" placeholder="Seu login" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
-        <div class="lf"><span class="lf-ic">🔑</span><input type="password" id="loginClienteSenha" placeholder="Sua senha" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
+        <div class="lf"><span class="lf-ic">👤</span><input type="text" id="loginClienteUser" placeholder="Seu login" autocomplete="off" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
+        <div class="lf"><span class="lf-ic">🔑</span><input type="password" id="loginClienteSenha" placeholder="Sua senha" autocomplete="new-password" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
         <div class="login-erro" id="loginClienteErro">⚠️ Login ou senha incorretos</div>
         <button class="btn-azul" onclick="fazerLoginUnificado()" style="font-size:15px;padding:14px;">🔑 Entrar</button>
       </div>
@@ -4094,6 +4094,11 @@ function irPara(tela){
       const lc=document.getElementById('loginClienteCard');
       if(cc)cc.style.display='none';
       if(lc)lc.style.display='block';
+      // Limpa campos para evitar autocomplete do browser disparar login indesejado
+      const uf=document.getElementById('loginClienteUser');
+      const pf=document.getElementById('loginClienteSenha');
+      if(uf) uf.value='';
+      if(pf) pf.value='';
     },10);
   }
   if(tela==='home')renderHome();

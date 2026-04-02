@@ -2023,9 +2023,7 @@ document.addEventListener('click', e=>{
 });
 
 let db={
-  admins:[
-    {id:1,usuario:'admin',_h:'d4m4v4321',nome:'Administrador',nivel:'super'},
-  ],
+  admins:[], // carregado do backend — nunca armazenar credenciais no frontend
   mercados:[
     // Mercados carregados do backend via carregarDadosBackend()
     // Esta lista começa vazia — os mercados reais vêm do MongoDB
@@ -4087,14 +4085,14 @@ function irPara(tela){
   }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(tela).classList.add('active');
-  // Ao voltar para login, mostra card normal
+  // Ao voltar para login, mostra card normal e limpa campos
   if(tela==='login'){
     setTimeout(()=>{
       const cc=document.getElementById('cadastroCard');
       const lc=document.getElementById('loginClienteCard');
       if(cc)cc.style.display='none';
       if(lc)lc.style.display='block';
-      // Limpa campos para evitar autocomplete do browser disparar login indesejado
+      // Limpa campos para evitar que autocomplete do browser dispare login indesejado
       const uf=document.getElementById('loginClienteUser');
       const pf=document.getElementById('loginClienteSenha');
       if(uf) uf.value='';

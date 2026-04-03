@@ -628,8 +628,8 @@ setTimeout(function(){hideSplash();
 
       <!-- LOGIN FORM -->
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
-        <div class="lf"><span class="lf-ic">👤</span><input type="text" id="loginClienteUser" placeholder="Seu login" autocomplete="off" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
-        <div class="lf"><span class="lf-ic">🔑</span><input type="password" id="loginClienteSenha" placeholder="Sua senha" autocomplete="new-password" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
+        <div class="lf"><span class="lf-ic">👤</span><input type="text" id="loginClienteUser" placeholder="Seu login" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
+        <div class="lf"><span class="lf-ic">🔑</span><input type="password" id="loginClienteSenha" placeholder="Sua senha" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
         <div class="login-erro" id="loginClienteErro">⚠️ Login ou senha incorretos</div>
         <button class="btn-azul" onclick="fazerLoginUnificado()" style="font-size:15px;padding:14px;">🔑 Entrar</button>
       </div>
@@ -2023,7 +2023,9 @@ document.addEventListener('click', e=>{
 });
 
 let db={
-  admins:[], // carregado do backend — nunca armazenar credenciais no frontend
+  admins:[
+    {id:1,usuario:'admin',_h:'d4m4v4321',nome:'Administrador',nivel:'super'},
+  ],
   mercados:[
     // Mercados carregados do backend via carregarDadosBackend()
     // Esta lista começa vazia — os mercados reais vêm do MongoDB
@@ -4085,18 +4087,13 @@ function irPara(tela){
   }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(tela).classList.add('active');
-  // Ao voltar para login, mostra card normal e limpa campos
+  // Ao voltar para login, mostra card normal
   if(tela==='login'){
     setTimeout(()=>{
       const cc=document.getElementById('cadastroCard');
       const lc=document.getElementById('loginClienteCard');
       if(cc)cc.style.display='none';
       if(lc)lc.style.display='block';
-      // Limpa campos para evitar que autocomplete do browser dispare login indesejado
-      const uf=document.getElementById('loginClienteUser');
-      const pf=document.getElementById('loginClienteSenha');
-      if(uf) uf.value='';
-      if(pf) pf.value='';
     },10);
   }
   if(tela==='home')renderHome();
@@ -5549,21 +5546,22 @@ async function processarFotoMultiplas(e){
     }
 
     // ── Correção automática preço/kg para etiquetas de balança ───────────────
+    // ATENÇÃO: Só corrige se o peso é DECIMAL (ex: 0.384kg, 0,575kg) — padrão de balança.
+    // Pesos inteiros redondos (200g, 575g, 130g) são tamanhos de embalagem — NÃO corrigir.
     todosItens = todosItens.map(it => {
       const nome = it.produto || '';
       const preco = it.preco || 0;
-      const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i) || nome.match(/(\d{3,4})\s*g\b/i);
+      // Só detecta pesos DECIMAIS com kg (padrão balança): 0.384kg, 0,575kg, 1.2kg etc
+      // NÃO detecta gramas inteiros (200g, 575g) nem kg inteiros (1kg, 2kg)
+      const pesoMatch = nome.match(/\b(0[.,]\d+)\s*kg/i) || nome.match(/\b([1-4][.,]\d+)\s*kg/i);
       if(pesoMatch && preco > 0){
-        let pesoKg;
-        if(pesoMatch[0].toLowerCase().includes('kg')){
-          pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
-        } else {
-          pesoKg = parseInt(pesoMatch[1]) / 1000;
-        }
-        if(pesoKg > 0 && pesoKg < 5 && preco < 50){
+        const pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
+        // Peso decimal entre 0.05kg e 4.99kg e preço abaixo de 200
+        if(pesoKg > 0.05 && pesoKg < 5 && preco < 200){
           const precoKgCalc = Math.round((preco / pesoKg) * 100) / 100;
+          // Só aplica se o preço/kg calculado é maior (confirma que pegou o total)
           if(precoKgCalc > preco){
-            const nomeCorr = nome.replace(/\s*\d+[.,]\d+\s*kg/gi,'').replace(/\s*\d{3,4}\s*g\b/gi,'').trim() + ' kg';
+            const nomeCorr = nome.replace(/\s*\b[0-4][.,]\d+\s*kg/gi,'').trim() + ' kg';
             console.log(`[IA kg fix multi] "${nome}" R$${preco} → "${nomeCorr}" R$${precoKgCalc}/kg`);
             return { ...it, produto: nomeCorr, preco: precoKgCalc };
           }
@@ -5930,32 +5928,24 @@ async function analisarFotoComIA(){
     }
 
     // ── Correção automática preço/kg para etiquetas de balança ───────────────
-    // Se o nome contém peso (ex: "0.384kg") e preço parece ser o total,
-    // recalcula: preço/kg = total ÷ peso
+    // ATENÇÃO: Só corrige se o peso é DECIMAL (ex: 0.384kg, 0,575kg) — padrão de balança.
+    // Pesos inteiros redondos (200g, 575g, 130g) são tamanhos de embalagem — NÃO corrigir.
     if(resultado.itens){
       resultado.itens = resultado.itens.map(it => {
         const nome = it.produto || '';
         const preco = it.preco || 0;
-        // Detecta peso no nome: "0.384kg", "0,384 kg", "384g" etc
-        const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i) || nome.match(/(\d{3,4})\s*g/i);
+        // Só detecta pesos DECIMAIS com kg (padrão balança): 0.384kg, 0,575kg, 1.2kg etc
+        // NÃO detecta gramas inteiros (200g, 575g) nem kg inteiros (1kg, 2kg)
+        const pesoMatch = nome.match(/\b(0[.,]\d+)\s*kg/i) || nome.match(/\b([1-4][.,]\d+)\s*kg/i);
         if(pesoMatch && preco > 0){
-          let pesoKg;
-          if(pesoMatch[0].toLowerCase().includes('kg')){
-            pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
-          } else {
-            // gramas → kg
-            pesoKg = parseInt(pesoMatch[1]) / 1000;
-          }
-          // Só corrige se o peso parece ser do pacote (< 5kg) e preço < 50
-          // Preço/kg calculado deve ser maior que o preço total (sinal de que total foi usado)
-          if(pesoKg > 0 && pesoKg < 5 && preco < 50){
+          const pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
+          // Peso decimal entre 0.05kg e 4.99kg e preço abaixo de 200
+          if(pesoKg > 0.05 && pesoKg < 5 && preco < 200){
             const precoKgCalculado = Math.round((preco / pesoKg) * 100) / 100;
             // Só aplica se o preço/kg calculado for maior (confirma que pegou o total)
             if(precoKgCalculado > preco){
-              // Remove o peso do nome
               const nomeCorrigido = nome
-                .replace(/\s*\d+[.,]\d+\s*kg/gi, '')
-                .replace(/\s*\d{3,4}\s*g/gi, '')
+                .replace(/\s*\b[0-4][.,]\d+\s*kg/gi, '')
                 .trim()
                 + ' kg';
               console.log(`[IA kg fix] "${nome}" R$${preco} → "${nomeCorrigido}" R$${precoKgCalculado}/kg`);

@@ -16,8 +16,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PreçoCerto">
-<!-- apple-touch-icon: usado pelo Safari quando o usuário adiciona à tela inicial -->
-<!-- iOS aplica arredondamento automaticamente — NÃO usar imagem com rounded corners -->
+<!-- Safari/iPhone: adicionar à tela inicial usa este ícone (180x180, sem arredondamento) -->
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
 <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144.png">
@@ -492,11 +491,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--texto);min-he
 <body>
 
 <!-- SPLASH SCREEN (cobre a transição do servidor para o app) -->
-<div id="splashScreen" style="position:fixed;inset:0;z-index:999999;background:linear-gradient(145deg,#0B4F8A 0%,#1A73C8 50%,#2E9EE8 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;">
-  <div style="font-size:64px;margin-bottom:16px;">🔍</div>
+<div id="splashScreen" style="position:fixed;inset:0;z-index:999999;background:#1A73C8;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+  <img src="/icons/icon-192.png" alt="PreçoCerto" style="width:120px;height:120px;border-radius:26px;margin-bottom:20px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
   <div style="font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:28px;font-weight:900;color:#fff;letter-spacing:.5px;">PreçoCerto</div>
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;">Compare preços e economize</div>
-  <div style="margin-top:30px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;">Piatã, Bahia</div>
+  <div style="margin-top:36px;display:flex;flex-direction:column;align-items:center;gap:10px;">
     <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
     <div id="splashStatus" style="font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:12px;color:rgba(255,255,255,.6);">Carregando...</div>
   </div>

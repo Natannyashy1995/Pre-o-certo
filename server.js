@@ -3358,6 +3358,120 @@ app.delete('/api/admin/propagandas/:id', adminAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
+
+// ═══════════════════════════════════════════════════════
+// POLÍTICA DE PRIVACIDADE — URL pública para o Google Play
+// ═══════════════════════════════════════════════════════
+app.get('/privacidade', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidade — PreçoCerto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
+    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
+    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 13px; opacity: .85; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin: 28px 0 10px; border-left: 4px solid #1A73C8; padding-left: 12px; }
+    p { font-size: 14px; color: #333; margin-bottom: 10px; }
+    ul { margin: 8px 0 10px 20px; }
+    li { font-size: 14px; color: #333; margin-bottom: 6px; }
+    .badge { display: inline-block; background: #E8F4FD; color: #1A73C8; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-bottom: 20px; }
+    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
+    a { color: #1A73C8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛒 PreçoCerto</h1>
+    <p>Política de Privacidade</p>
+  </div>
+  <div class="container">
+    <span class="badge">Última atualização: abril de 2026</span>
+
+    <p>O <strong>PreçoCerto</strong> é um aplicativo de comparação de preços de supermercados da cidade de Piatã, Bahia. Esta Política de Privacidade explica como coletamos, usamos e protegemos as informações dos nossos usuários.</p>
+
+    <h2>1. Dados que coletamos</h2>
+    <p>Ao criar uma conta, coletamos:</p>
+    <ul>
+      <li>Nome completo</li>
+      <li>Número de WhatsApp (usado como identificação)</li>
+      <li>Login (apelido de usuário)</li>
+      <li>Senha (armazenada de forma criptografada)</li>
+      <li>E-mail (opcional)</li>
+      <li>Bairro/localidade (opcional)</li>
+    </ul>
+    <p>Durante o uso do app, também coletamos:</p>
+    <ul>
+      <li>Fotos de etiquetas de preços enviadas voluntariamente pelo usuário</li>
+      <li>Preços e produtos contribuídos pelo usuário</li>
+      <li>Registros de acesso (logs) para segurança e moderação</li>
+    </ul>
+
+    <h2>2. Como usamos seus dados</h2>
+    <ul>
+      <li>Criar e gerenciar sua conta no app</li>
+      <li>Exibir preços e produtos comparativos para a comunidade</li>
+      <li>Enviar notificações de promoções via WhatsApp (somente se autorizado)</li>
+      <li>Moderar contribuições e garantir a qualidade das informações</li>
+      <li>Melhorar o serviço com base no uso agregado e anônimo</li>
+    </ul>
+
+    <h2>3. Compartilhamento de dados</h2>
+    <p>Seus dados <strong>não são vendidos</strong> a terceiros. Compartilhamos informações apenas nos seguintes casos:</p>
+    <ul>
+      <li>Com serviços técnicos necessários para o funcionamento do app (MongoDB Atlas para banco de dados, Render para hospedagem, Google Gemini para análise de imagens de preços)</li>
+      <li>Quando exigido por lei ou autoridade competente</li>
+    </ul>
+
+    <h2>4. Fotos e imagens</h2>
+    <p>As fotos de etiquetas de preços enviadas pelos usuários são processadas pela inteligência artificial do Google Gemini para identificar produtos e preços. As imagens são usadas exclusivamente para esta finalidade e não são compartilhadas publicamente sem consentimento.</p>
+
+    <h2>5. Segurança</h2>
+    <p>Adotamos medidas técnicas para proteger seus dados, incluindo:</p>
+    <ul>
+      <li>Senhas armazenadas com hash criptográfico (bcrypt)</li>
+      <li>Autenticação via token JWT</li>
+      <li>Comunicação criptografada via HTTPS</li>
+      <li>Acesso restrito ao painel administrativo</li>
+    </ul>
+
+    <h2>6. Seus direitos (LGPD)</h2>
+    <p>De acordo com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você tem direito a:</p>
+    <ul>
+      <li>Acessar seus dados pessoais</li>
+      <li>Corrigir dados incorretos ou desatualizados</li>
+      <li>Solicitar a exclusão da sua conta e dados</li>
+      <li>Revogar o consentimento para notificações</li>
+    </ul>
+    <p>Para exercer esses direitos, entre em contato pelo suporte dentro do próprio app ou pelo WhatsApp disponível na plataforma.</p>
+
+    <h2>7. Retenção de dados</h2>
+    <p>Seus dados são mantidos enquanto sua conta estiver ativa. Após a exclusão da conta, os dados são removidos em até 30 dias, exceto quando há obrigação legal de retenção.</p>
+
+    <h2>8. Crianças e adolescentes</h2>
+    <p>O PreçoCerto não é direcionado a crianças menores de 13 anos. Não coletamos intencionalmente dados de menores. Se identificarmos tal situação, removeremos os dados imediatamente.</p>
+
+    <h2>9. Alterações nesta política</h2>
+    <p>Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos os usuários sobre mudanças relevantes através do app. O uso contínuo do serviço após as alterações implica aceitação da nova política.</p>
+
+    <h2>10. Contato</h2>
+    <p>Dúvidas sobre esta política? Entre em contato pelo suporte no app PreçoCerto ou pelo e-mail disponível na página do aplicativo.</p>
+
+    <div class="footer">
+      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
+      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
 app.listen(PORT, () => {
   console.log(`
 ╔══════════════════════════════════════════╗

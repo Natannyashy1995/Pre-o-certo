@@ -3360,6 +3360,33 @@ app.delete('/api/admin/propagandas/:id', adminAuth, async (req, res) => {
 
 
 // ═══════════════════════════════════════════════════════
+// EXCLUSÃO DE CONTA — exigida pelo Google Play
+// ═══════════════════════════════════════════════════════
+app.delete('/api/cliente/excluir-conta', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'cliente') return res.status(403).json({ erro: 'Apenas clientes podem excluir a própria conta' });
+    const { senha } = req.body;
+    if (!senha) return res.status(400).json({ erro: 'Senha obrigatória para confirmar exclusão' });
+
+    const cliente = await Cliente.findById(req.user.id);
+    if (!cliente) return res.status(404).json({ erro: 'Conta não encontrada' });
+
+    const senhaOk = await bcrypt.compare(senha, cliente.senhaHash);
+    if (!senhaOk) return res.status(401).json({ erro: 'Senha incorreta. Tente novamente.' });
+
+    // Remove o cliente
+    await Cliente.findByIdAndDelete(cliente._id);
+
+    // Registra log de exclusão
+    await registrarLog('auth', `Conta excluída pelo próprio usuário: ${cliente.login} (${cliente.telefone})`, cliente.login, getIP(req));
+
+    res.json({ ok: true, mensagem: 'Conta excluída com sucesso' });
+  } catch(e) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════
 // POLÍTICA DE PRIVACIDADE — URL pública para o Google Play
 // ═══════════════════════════════════════════════════════
 app.get('/privacidade', (req, res) => {
@@ -3466,6 +3493,125 @@ app.get('/privacidade', (req, res) => {
     <div class="footer">
       <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
       <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+// ═══════════════════════════════════════════════════════
+// EXCLUSÃO DE CONTA — URL pública exigida pelo Google Play
+// ═══════════════════════════════════════════════════════
+app.get('/excluir-conta', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excluir Conta — PreçoCerto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
+    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
+    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 13px; opacity: .85; }
+    .container { max-width: 680px; margin: 0 auto; padding: 28px 20px 60px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin-bottom: 12px; }
+    p { font-size: 14px; color: #444; margin-bottom: 10px; }
+    ol { margin: 8px 0 10px 20px; }
+    li { font-size: 14px; color: #444; margin-bottom: 8px; }
+    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #1A73C8; color: #fff; border-radius: 50%; font-size: 12px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+    .step { display: flex; align-items: flex-start; margin-bottom: 14px; }
+    .step-text { font-size: 14px; color: #444; padding-top: 2px; }
+    .warn { background: #FFF8E1; border-left: 4px solid #F9A825; padding: 14px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #6D4C00; }
+    .warn strong { display: block; margin-bottom: 4px; }
+    .data-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .data-item { background: #f0f4ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1A3C8F; }
+    .keep-item { background: #fff0f0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #8B0000; }
+    .badge-del { display: inline-block; background: #FDECEA; color: #C62828; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .badge-keep { display: inline-block; background: #FFF8E1; color: #B07000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .contact-box { background: #E8F4FD; border-radius: 10px; padding: 16px 20px; text-align: center; }
+    .contact-box p { color: #1A73C8; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .contact-box small { color: #555; font-size: 12px; }
+    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
+    @media (max-width: 480px) { .data-list { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛒 PreçoCerto</h1>
+    <p>Solicitação de Exclusão de Conta</p>
+  </div>
+
+  <div class="container">
+
+    <div class="card">
+      <h2>Como solicitar a exclusão da sua conta</h2>
+      <p>Siga os passos abaixo pelo próprio aplicativo PreçoCerto:</p>
+
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-text">Abra o app <strong>PreçoCerto</strong> no seu celular e faça login na sua conta.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-text">Toque no ícone de menu (<strong>☰</strong>) no canto superior da tela.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-text">Acesse <strong>Minha Conta → Configurações</strong>.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-text">Toque em <strong>"Excluir minha conta"</strong> e confirme a solicitação.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-text">Sua conta e dados serão removidos em até <strong>30 dias</strong>.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Não consegue acessar o app?</h2>
+      <p>Se não conseguir fazer login para solicitar a exclusão, acesse o app normalmente e utilize o canal de <strong>Contato / Suporte</strong> disponível no menu principal.</p>
+      <div class="contact-box">
+        <p>💬 Suporte dentro do app PreçoCerto</p>
+        <small>Informe seu nome de usuário (login) e solicite a exclusão. O administrador processará o pedido em até 48 horas úteis.</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>O que será excluído <span class="badge-del">REMOVIDO</span></h2>
+      <div class="data-list">
+        <div class="data-item">👤 Nome e login</div>
+        <div class="data-item">📱 Número de WhatsApp</div>
+        <div class="data-item">📧 E-mail</div>
+        <div class="data-item">🏘️ Bairro/localidade</div>
+        <div class="data-item">🔑 Senha (hash)</div>
+        <div class="data-item">🖼️ Fotos enviadas</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>O que pode ser mantido <span class="badge-keep">ATÉ 30 DIAS</span></h2>
+      <div class="data-list">
+        <div class="keep-item">📋 Logs de segurança (obrigação legal)</div>
+        <div class="keep-item">💰 Preços contribuídos (sem identificação)</div>
+      </div>
+      <p style="margin-top:12px; font-size:13px; color:#777;">Preços contribuídos anonimamente podem permanecer no sistema sem qualquer vínculo com sua identidade.</p>
+    </div>
+
+    <div class="warn">
+      <strong>⚠️ Atenção</strong>
+      A exclusão da conta é irreversível. Após a confirmação, não será possível recuperar os dados ou contribuições vinculadas à sua conta.
+    </div>
+
+    <div class="footer">
+      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
+      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
+      <p style="margin-top:6px;"><a href="/privacidade" style="color:#1A73C8;">Política de Privacidade</a></p>
     </div>
   </div>
 </body>

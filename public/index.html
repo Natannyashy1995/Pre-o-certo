@@ -5785,13 +5785,9 @@ TIPO 2 — ETIQUETA DE BALANÇA (açougue, frios, hortifruti — produto vendido
   - Exemplo ERRADO: nome="Salsicha Perdigão 0.384kg", preco=5.37
 
 TIPO 3 — CUPOM FISCAL (linhas 01, 02, 03... com código de barras):
-  - Nome = DESCRIÇÃO da linha; preço = PENÚLTIMO número (unitário, antes do total do item)
-  - Extraia TODOS os itens numerados (01, 02, 03...) sem exceção — alimentos, higiene, limpeza, bebidas, tudo
-  - Abrev alimentos: BOV=Bovina, LING=Linguiça, CERV=Cerveja, ARR=Arroz, PARB=Parboilizado, FRNG=Frango, ACUC=Açúcar, CAFE=Café
-  - Abrev higiene: SAB=Sabonete, SAB L=Sabonete Líquido, INTIMO=Íntimo, DERM=Dermacyd, SHAM=Shampoo, COND=Condicionador, DEOD=Desodorante, CREM=Creme, PAST DENT=Pasta de Dente
-  - Abrev limpeza: DET=Detergente, DESINF=Desinfetante, AGUA SAB=Água Sanitária, LAVA=Lava-roupa
-  - Abrev gerais: L=Litro, KG=Quilograma, UN=Unidade, PCT=Pacote, CX=Caixa, FRD=Fardo, GF=Garrafa
-  - NÃO inclua: TOTAL, SUBTOTAL, DESCONTO, TROCO, CARTAO, DINHEIRO
+  - Nome = DESCRIÇÃO da linha; preço = PENÚLTIMO número (unitário)
+  - Abrev: BOV=Bovina, LING=Linguiça, CERV=Cerveja, ARR=Arroz, PARB=Parboilizado
+  - NÃO inclua: TOTAL, SUBTOTAL, DESCONTO, TROCO
 
 TIPO 4 — LISTA DE PREÇOS em quadro/banner (linhas com "........"):
   - "R" cortado pelo quadrado = número visível É o preço
@@ -9791,8 +9787,8 @@ async function salvarMercado(){
   if(!end)  { showToast('Endereço é obrigatório!','⚠️'); return; }
   if(!bairro){ showToast('Bairro é obrigatório!','⚠️'); return; }
   if(!whats) { showToast('WhatsApp é obrigatório!','⚠️'); return; }
-  const lat = parseFloat(document.getElementById('inputMercLat')?.value)||null;
-  const lng = parseFloat(document.getElementById('inputMercLng')?.value)||null;
+  const lat = parseFloat((document.getElementById('inputMercLat')?.value||'').replace(',','.'))||null;
+  const lng = parseFloat((document.getElementById('inputMercLng')?.value||'').replace(',','.'))||null;
   const dados = {
     nome,
     icone:    document.getElementById('inputMercEmoji').value.trim()||'🏪',
@@ -9998,8 +9994,8 @@ function fecharMapaPicker(){
 
 // Abre picker para NOVO mercado (form de adição)
 function abrirMapaMercado(){
-  const latAtual = parseFloat(document.getElementById('inputMercLat')?.value)||null;
-  const lngAtual = parseFloat(document.getElementById('inputMercLng')?.value)||null;
+  const latAtual = parseFloat((document.getElementById('inputMercLat')?.value||'').replace(',','.'))||null;
+  const lngAtual = parseFloat((document.getElementById('inputMercLng')?.value||'').replace(',','.'))||null;
   abrirMapaPicker(latAtual, lngAtual, (lat, lng)=>{
     document.getElementById('inputMercLat').value = lat;
     document.getElementById('inputMercLng').value = lng;

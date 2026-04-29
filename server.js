@@ -1438,7 +1438,7 @@ app.post('/api/admin/mercados', adminAuth, async (req, res) => {
   try {
     const { nome, icone, endereco, bairro, whatsapp, website, parceiro, plano, usuario, senha, lat, lng } = req.body;
     if (!nome) return res.status(400).json({ erro:'Nome é obrigatório' });
-    const dados = { nome, icone:icone||'🏪', endereco:endereco||'', bairro:bairro||'Centro', cidade:req.body.cidade||'Piatã', whatsapp:whatsapp||'', website:website||null, parceiro:!!parceiro, plano:plano||null, lat:lat||null, lng:lng||null };
+    const dados = { nome, icone:icone||'🏪', endereco:endereco||'', bairro:bairro||'Centro', cidade:req.body.cidade||'Piatã', whatsapp:whatsapp||'', website:website||null, parceiro:!!parceiro, plano:plano||null, lat: lat != null ? parseFloat(String(lat).replace(',','.')) || null : null, lng: lng != null ? parseFloat(String(lng).replace(',','.')) || null : null };
     if (usuario) dados.usuario = usuario;
     if (senha)   dados.senhaHash = await bcrypt.hash(senha, 10);
     const m = await Mercado.create(dados);
@@ -2896,239 +2896,6 @@ app.post('/api/nfce/salvar-precos', async (req, res) => {
   res.json({ ok: true, salvos: salvos.length });
 });
 
-// ═══════════════════════════════════════════════════════
-// POLÍTICA DE PRIVACIDADE — URL pública para o Google Play
-// ═══════════════════════════════════════════════════════
-app.get('/privacidade', (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Política de Privacidade — PreçoCerto</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
-    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
-    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-    .header p { font-size: 13px; opacity: .85; }
-    .container { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
-    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin: 28px 0 10px; border-left: 4px solid #1A73C8; padding-left: 12px; }
-    p { font-size: 14px; color: #333; margin-bottom: 10px; }
-    ul { margin: 8px 0 10px 20px; }
-    li { font-size: 14px; color: #333; margin-bottom: 6px; }
-    .badge { display: inline-block; background: #E8F4FD; color: #1A73C8; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-bottom: 20px; }
-    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
-    a { color: #1A73C8; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>🛒 PreçoCerto</h1>
-    <p>Política de Privacidade</p>
-  </div>
-  <div class="container">
-    <span class="badge">Última atualização: abril de 2026</span>
-
-    <p>O <strong>PreçoCerto</strong> é um aplicativo de comparação de preços de supermercados da cidade de Piatã, Bahia. Esta Política de Privacidade explica como coletamos, usamos e protegemos as informações dos nossos usuários.</p>
-
-    <h2>1. Dados que coletamos</h2>
-    <p>Ao criar uma conta, coletamos:</p>
-    <ul>
-      <li>Nome completo</li>
-      <li>Número de WhatsApp (usado como identificação)</li>
-      <li>Login (apelido de usuário)</li>
-      <li>Senha (armazenada de forma criptografada)</li>
-      <li>E-mail (opcional)</li>
-      <li>Bairro/localidade (opcional)</li>
-    </ul>
-    <p>Durante o uso do app, também coletamos:</p>
-    <ul>
-      <li>Fotos de etiquetas de preços enviadas voluntariamente pelo usuário</li>
-      <li>Preços e produtos contribuídos pelo usuário</li>
-      <li>Registros de acesso (logs) para segurança e moderação</li>
-    </ul>
-
-    <h2>2. Como usamos seus dados</h2>
-    <ul>
-      <li>Criar e gerenciar sua conta no app</li>
-      <li>Exibir preços e produtos comparativos para a comunidade</li>
-      <li>Enviar notificações de promoções via WhatsApp (somente se autorizado)</li>
-      <li>Moderar contribuições e garantir a qualidade das informações</li>
-      <li>Melhorar o serviço com base no uso agregado e anônimo</li>
-    </ul>
-
-    <h2>3. Compartilhamento de dados</h2>
-    <p>Seus dados <strong>não são vendidos</strong> a terceiros. Compartilhamos informações apenas nos seguintes casos:</p>
-    <ul>
-      <li>Com serviços técnicos necessários para o funcionamento do app (MongoDB Atlas para banco de dados, Render para hospedagem, Google Gemini para análise de imagens de preços)</li>
-      <li>Quando exigido por lei ou autoridade competente</li>
-    </ul>
-
-    <h2>4. Fotos e imagens</h2>
-    <p>As fotos de etiquetas de preços enviadas pelos usuários são processadas pela inteligência artificial do Google Gemini para identificar produtos e preços. As imagens são usadas exclusivamente para esta finalidade e não são compartilhadas publicamente sem consentimento.</p>
-
-    <h2>5. Segurança</h2>
-    <p>Adotamos medidas técnicas para proteger seus dados, incluindo:</p>
-    <ul>
-      <li>Senhas armazenadas com hash criptográfico (bcrypt)</li>
-      <li>Autenticação via token JWT</li>
-      <li>Comunicação criptografada via HTTPS</li>
-      <li>Acesso restrito ao painel administrativo</li>
-    </ul>
-
-    <h2>6. Seus direitos (LGPD)</h2>
-    <p>De acordo com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você tem direito a:</p>
-    <ul>
-      <li>Acessar seus dados pessoais</li>
-      <li>Corrigir dados incorretos ou desatualizados</li>
-      <li>Solicitar a exclusão da sua conta e dados</li>
-      <li>Revogar o consentimento para notificações</li>
-    </ul>
-    <p>Para exercer esses direitos, entre em contato pelo suporte dentro do próprio app ou pelo WhatsApp disponível na plataforma.</p>
-
-    <h2>7. Retenção de dados</h2>
-    <p>Seus dados são mantidos enquanto sua conta estiver ativa. Após a exclusão da conta, os dados são removidos em até 30 dias, exceto quando há obrigação legal de retenção.</p>
-
-    <h2>8. Crianças e adolescentes</h2>
-    <p>O PreçoCerto não é direcionado a crianças menores de 13 anos. Não coletamos intencionalmente dados de menores. Se identificarmos tal situação, removeremos os dados imediatamente.</p>
-
-    <h2>9. Alterações nesta política</h2>
-    <p>Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos os usuários sobre mudanças relevantes através do app. O uso contínuo do serviço após as alterações implica aceitação da nova política.</p>
-
-    <h2>10. Contato</h2>
-    <p>Dúvidas sobre esta política? Entre em contato pelo suporte no app PreçoCerto ou pelo e-mail disponível na página do aplicativo.</p>
-
-    <div class="footer">
-      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
-      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
-    </div>
-  </div>
-</body>
-</html>`);
-});
-
-// ═══════════════════════════════════════════════════════
-// EXCLUSÃO DE CONTA — URL pública exigida pelo Google Play
-// ═══════════════════════════════════════════════════════
-app.get('/excluir-conta', (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excluir Conta — PreçoCerto</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
-    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
-    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-    .header p { font-size: 13px; opacity: .85; }
-    .container { max-width: 680px; margin: 0 auto; padding: 28px 20px 60px; }
-    .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin-bottom: 12px; }
-    p { font-size: 14px; color: #444; margin-bottom: 10px; }
-    ol { margin: 8px 0 10px 20px; }
-    li { font-size: 14px; color: #444; margin-bottom: 8px; }
-    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #1A73C8; color: #fff; border-radius: 50%; font-size: 12px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
-    .step { display: flex; align-items: flex-start; margin-bottom: 14px; }
-    .step-text { font-size: 14px; color: #444; padding-top: 2px; }
-    .warn { background: #FFF8E1; border-left: 4px solid #F9A825; padding: 14px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #6D4C00; }
-    .warn strong { display: block; margin-bottom: 4px; }
-    .data-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-    .data-item { background: #f0f4ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1A3C8F; }
-    .keep-item { background: #fff0f0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #8B0000; }
-    .badge-del { display: inline-block; background: #FDECEA; color: #C62828; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
-    .badge-keep { display: inline-block; background: #FFF8E1; color: #B07000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
-    .contact-box { background: #E8F4FD; border-radius: 10px; padding: 16px 20px; text-align: center; }
-    .contact-box p { color: #1A73C8; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-    .contact-box small { color: #555; font-size: 12px; }
-    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
-    @media (max-width: 480px) { .data-list { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>🛒 PreçoCerto</h1>
-    <p>Solicitação de Exclusão de Conta</p>
-  </div>
-
-  <div class="container">
-
-    <div class="card">
-      <h2>Como solicitar a exclusão da sua conta</h2>
-      <p>Siga os passos abaixo pelo próprio aplicativo PreçoCerto:</p>
-
-      <div class="step">
-        <span class="step-num">1</span>
-        <span class="step-text">Abra o app <strong>PreçoCerto</strong> no seu celular e faça login na sua conta.</span>
-      </div>
-      <div class="step">
-        <span class="step-num">2</span>
-        <span class="step-text">Toque no ícone de menu (<strong>☰</strong>) no canto superior da tela.</span>
-      </div>
-      <div class="step">
-        <span class="step-num">3</span>
-        <span class="step-text">Acesse <strong>Minha Conta → Configurações</strong>.</span>
-      </div>
-      <div class="step">
-        <span class="step-num">4</span>
-        <span class="step-text">Toque em <strong>"Excluir minha conta"</strong> e confirme a solicitação.</span>
-      </div>
-      <div class="step">
-        <span class="step-num">5</span>
-        <span class="step-text">Sua conta e dados serão removidos em até <strong>30 dias</strong>.</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Não consegue acessar o app?</h2>
-      <p>Se não conseguir fazer login para solicitar a exclusão, acesse o app normalmente e utilize o canal de <strong>Contato / Suporte</strong> disponível no menu principal.</p>
-      <div class="contact-box">
-        <p>💬 Suporte dentro do app PreçoCerto</p>
-        <small>Informe seu nome de usuário (login) e solicite a exclusão. O administrador processará o pedido em até 48 horas úteis.</small>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>O que será excluído <span class="badge-del">REMOVIDO</span></h2>
-      <div class="data-list">
-        <div class="data-item">👤 Nome e login</div>
-        <div class="data-item">📱 Número de WhatsApp</div>
-        <div class="data-item">📧 E-mail</div>
-        <div class="data-item">🏘️ Bairro/localidade</div>
-        <div class="data-item">🔑 Senha (hash)</div>
-        <div class="data-item">🖼️ Fotos enviadas</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>O que pode ser mantido <span class="badge-keep">ATÉ 30 DIAS</span></h2>
-      <div class="data-list">
-        <div class="keep-item">📋 Logs de segurança (obrigação legal)</div>
-        <div class="keep-item">💰 Preços contribuídos (sem identificação)</div>
-      </div>
-      <p style="margin-top:12px; font-size:13px; color:#777;">Preços contribuídos anonimamente podem permanecer no sistema sem qualquer vínculo com sua identidade.</p>
-    </div>
-
-    <div class="warn">
-      <strong>⚠️ Atenção</strong>
-      A exclusão da conta é irreversível. Após a confirmação, não será possível recuperar os dados ou contribuições vinculadas à sua conta.
-    </div>
-
-    <div class="footer">
-      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
-      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
-      <p style="margin-top:6px;"><a href="/privacidade" style="color:#1A73C8;">Política de Privacidade</a></p>
-    </div>
-  </div>
-</body>
-</html>`);
-});
-
-
 // Qualquer rota /api/* não encontrada retorna 404 JSON (não HTML)
 app.all('/api/{*path}', (req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada: ' + req.method + ' ' + req.path });
@@ -3619,6 +3386,237 @@ app.delete('/api/cliente/excluir-conta', authMiddleware, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// POLÍTICA DE PRIVACIDADE — URL pública para o Google Play
+// ═══════════════════════════════════════════════════════
+app.get('/privacidade', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidade — PreçoCerto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
+    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
+    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 13px; opacity: .85; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin: 28px 0 10px; border-left: 4px solid #1A73C8; padding-left: 12px; }
+    p { font-size: 14px; color: #333; margin-bottom: 10px; }
+    ul { margin: 8px 0 10px 20px; }
+    li { font-size: 14px; color: #333; margin-bottom: 6px; }
+    .badge { display: inline-block; background: #E8F4FD; color: #1A73C8; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-bottom: 20px; }
+    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
+    a { color: #1A73C8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛒 PreçoCerto</h1>
+    <p>Política de Privacidade</p>
+  </div>
+  <div class="container">
+    <span class="badge">Última atualização: abril de 2026</span>
+
+    <p>O <strong>PreçoCerto</strong> é um aplicativo de comparação de preços de supermercados da cidade de Piatã, Bahia. Esta Política de Privacidade explica como coletamos, usamos e protegemos as informações dos nossos usuários.</p>
+
+    <h2>1. Dados que coletamos</h2>
+    <p>Ao criar uma conta, coletamos:</p>
+    <ul>
+      <li>Nome completo</li>
+      <li>Número de WhatsApp (usado como identificação)</li>
+      <li>Login (apelido de usuário)</li>
+      <li>Senha (armazenada de forma criptografada)</li>
+      <li>E-mail (opcional)</li>
+      <li>Bairro/localidade (opcional)</li>
+    </ul>
+    <p>Durante o uso do app, também coletamos:</p>
+    <ul>
+      <li>Fotos de etiquetas de preços enviadas voluntariamente pelo usuário</li>
+      <li>Preços e produtos contribuídos pelo usuário</li>
+      <li>Registros de acesso (logs) para segurança e moderação</li>
+    </ul>
+
+    <h2>2. Como usamos seus dados</h2>
+    <ul>
+      <li>Criar e gerenciar sua conta no app</li>
+      <li>Exibir preços e produtos comparativos para a comunidade</li>
+      <li>Enviar notificações de promoções via WhatsApp (somente se autorizado)</li>
+      <li>Moderar contribuições e garantir a qualidade das informações</li>
+      <li>Melhorar o serviço com base no uso agregado e anônimo</li>
+    </ul>
+
+    <h2>3. Compartilhamento de dados</h2>
+    <p>Seus dados <strong>não são vendidos</strong> a terceiros. Compartilhamos informações apenas nos seguintes casos:</p>
+    <ul>
+      <li>Com serviços técnicos necessários para o funcionamento do app (MongoDB Atlas para banco de dados, Render para hospedagem, Google Gemini para análise de imagens de preços)</li>
+      <li>Quando exigido por lei ou autoridade competente</li>
+    </ul>
+
+    <h2>4. Fotos e imagens</h2>
+    <p>As fotos de etiquetas de preços enviadas pelos usuários são processadas pela inteligência artificial do Google Gemini para identificar produtos e preços. As imagens são usadas exclusivamente para esta finalidade e não são compartilhadas publicamente sem consentimento.</p>
+
+    <h2>5. Segurança</h2>
+    <p>Adotamos medidas técnicas para proteger seus dados, incluindo:</p>
+    <ul>
+      <li>Senhas armazenadas com hash criptográfico (bcrypt)</li>
+      <li>Autenticação via token JWT</li>
+      <li>Comunicação criptografada via HTTPS</li>
+      <li>Acesso restrito ao painel administrativo</li>
+    </ul>
+
+    <h2>6. Seus direitos (LGPD)</h2>
+    <p>De acordo com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você tem direito a:</p>
+    <ul>
+      <li>Acessar seus dados pessoais</li>
+      <li>Corrigir dados incorretos ou desatualizados</li>
+      <li>Solicitar a exclusão da sua conta e dados</li>
+      <li>Revogar o consentimento para notificações</li>
+    </ul>
+    <p>Para exercer esses direitos, entre em contato pelo suporte dentro do próprio app ou pelo WhatsApp disponível na plataforma.</p>
+
+    <h2>7. Retenção de dados</h2>
+    <p>Seus dados são mantidos enquanto sua conta estiver ativa. Após a exclusão da conta, os dados são removidos em até 30 dias, exceto quando há obrigação legal de retenção.</p>
+
+    <h2>8. Crianças e adolescentes</h2>
+    <p>O PreçoCerto não é direcionado a crianças menores de 13 anos. Não coletamos intencionalmente dados de menores. Se identificarmos tal situação, removeremos os dados imediatamente.</p>
+
+    <h2>9. Alterações nesta política</h2>
+    <p>Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos os usuários sobre mudanças relevantes através do app. O uso contínuo do serviço após as alterações implica aceitação da nova política.</p>
+
+    <h2>10. Contato</h2>
+    <p>Dúvidas sobre esta política? Entre em contato pelo suporte no app PreçoCerto ou pelo e-mail disponível na página do aplicativo.</p>
+
+    <div class="footer">
+      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
+      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+// ═══════════════════════════════════════════════════════
+// EXCLUSÃO DE CONTA — URL pública exigida pelo Google Play
+// ═══════════════════════════════════════════════════════
+app.get('/excluir-conta', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excluir Conta — PreçoCerto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.7; }
+    .header { background: #1A73C8; color: #fff; padding: 32px 24px 28px; text-align: center; }
+    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 13px; opacity: .85; }
+    .container { max-width: 680px; margin: 0 auto; padding: 28px 20px 60px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    h2 { font-size: 16px; font-weight: 700; color: #1A73C8; margin-bottom: 12px; }
+    p { font-size: 14px; color: #444; margin-bottom: 10px; }
+    ol { margin: 8px 0 10px 20px; }
+    li { font-size: 14px; color: #444; margin-bottom: 8px; }
+    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #1A73C8; color: #fff; border-radius: 50%; font-size: 12px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+    .step { display: flex; align-items: flex-start; margin-bottom: 14px; }
+    .step-text { font-size: 14px; color: #444; padding-top: 2px; }
+    .warn { background: #FFF8E1; border-left: 4px solid #F9A825; padding: 14px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #6D4C00; }
+    .warn strong { display: block; margin-bottom: 4px; }
+    .data-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .data-item { background: #f0f4ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1A3C8F; }
+    .keep-item { background: #fff0f0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #8B0000; }
+    .badge-del { display: inline-block; background: #FDECEA; color: #C62828; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .badge-keep { display: inline-block; background: #FFF8E1; color: #B07000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .contact-box { background: #E8F4FD; border-radius: 10px; padding: 16px 20px; text-align: center; }
+    .contact-box p { color: #1A73C8; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .contact-box small { color: #555; font-size: 12px; }
+    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e5e5; }
+    @media (max-width: 480px) { .data-list { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛒 PreçoCerto</h1>
+    <p>Solicitação de Exclusão de Conta</p>
+  </div>
+
+  <div class="container">
+
+    <div class="card">
+      <h2>Como solicitar a exclusão da sua conta</h2>
+      <p>Siga os passos abaixo pelo próprio aplicativo PreçoCerto:</p>
+
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-text">Abra o app <strong>PreçoCerto</strong> no seu celular e faça login na sua conta.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-text">Toque no ícone de menu (<strong>☰</strong>) no canto superior da tela.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-text">Acesse <strong>Minha Conta → Configurações</strong>.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-text">Toque em <strong>"Excluir minha conta"</strong> e confirme a solicitação.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-text">Sua conta e dados serão removidos em até <strong>30 dias</strong>.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Não consegue acessar o app?</h2>
+      <p>Se não conseguir fazer login para solicitar a exclusão, acesse o app normalmente e utilize o canal de <strong>Contato / Suporte</strong> disponível no menu principal.</p>
+      <div class="contact-box">
+        <p>💬 Suporte dentro do app PreçoCerto</p>
+        <small>Informe seu nome de usuário (login) e solicite a exclusão. O administrador processará o pedido em até 48 horas úteis.</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>O que será excluído <span class="badge-del">REMOVIDO</span></h2>
+      <div class="data-list">
+        <div class="data-item">👤 Nome e login</div>
+        <div class="data-item">📱 Número de WhatsApp</div>
+        <div class="data-item">📧 E-mail</div>
+        <div class="data-item">🏘️ Bairro/localidade</div>
+        <div class="data-item">🔑 Senha (hash)</div>
+        <div class="data-item">🖼️ Fotos enviadas</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>O que pode ser mantido <span class="badge-keep">ATÉ 30 DIAS</span></h2>
+      <div class="data-list">
+        <div class="keep-item">📋 Logs de segurança (obrigação legal)</div>
+        <div class="keep-item">💰 Preços contribuídos (sem identificação)</div>
+      </div>
+      <p style="margin-top:12px; font-size:13px; color:#777;">Preços contribuídos anonimamente podem permanecer no sistema sem qualquer vínculo com sua identidade.</p>
+    </div>
+
+    <div class="warn">
+      <strong>⚠️ Atenção</strong>
+      A exclusão da conta é irreversível. Após a confirmação, não será possível recuperar os dados ou contribuições vinculadas à sua conta.
+    </div>
+
+    <div class="footer">
+      <p>PreçoCerto — Comparador de preços de Piatã, BA</p>
+      <p style="margin-top:6px;">© 2026 PreçoCerto. Todos os direitos reservados.</p>
+      <p style="margin-top:6px;"><a href="/privacidade" style="color:#1A73C8;">Política de Privacidade</a></p>
+    </div>
+  </div>
+</body>
+</html>`);
+});
 
 app.listen(PORT, () => {
   console.log(`

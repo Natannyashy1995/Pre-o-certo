@@ -8300,21 +8300,11 @@ async function aprovarContrib(id){
   if(btn){ btn.disabled=true; btn.textContent='Aprovando...'; }
   try {
     await apiReq('PATCH','/api/contribuicoes/'+id+'/aprovar',{});
-    // Rejeitar duplicatas pendentes do mesmo produto+mercado
-    const aprovada = db.contribuicoes.find(x=>String(x.id||x._id)===String(id));
-    if(aprovada){
-      const dups = db.contribuicoes.filter(x=>
-        String(x.id||x._id) !== String(id) &&
-        x.status === 'pendente' &&
-        String(x.produtoId) === String(aprovada.produtoId) &&
-        String(x.mercadoId) === String(aprovada.mercadoId)
-      );
-      for(const dup of dups){
-        try{ await apiReq('PATCH','/api/contribuicoes/'+String(dup.id||dup._id)+'/rejeitar',{motivo:'Duplicata'}); }catch(_){}
-      }
-    }
+    // Atualiza apenas esta contribuição no db local sem recarregar tudo
+    const contrib = db.contribuicoes.find(x=>String(x.id||x._id)===String(id));
+    if(contrib) contrib.status = 'aprovado';
     showToast('Contribuição aprovada e publicada! ✅','✅');
-    await carregarDadosAdmin();
+    // Re-renderiza sem recarregar do servidor — mantém as demais pendentes
     renderAdminForm();
   } catch(e){
     showToast('Erro ao aprovar: '+e.message,'❌');

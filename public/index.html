@@ -11152,8 +11152,9 @@ async function limparPrecosOrfaos(){
 const _CATMAP = {
     // ORDEM IMPORTA: frases compostas mais longas PRIMEIRO — ganham de palavras curtas
 
-    // Limpeza — ANTES de tudo para não conflitar com outros
+    // Limpeza — ANTES de Higiene e Cosméticos para "limpeza casa", "lava louça", "perfume ambiente" não irem para errado
     'Limpeza':      ['🧹',
+                     // Frases longas primeiro
                      'limpeza casa','limpeza pesada','limpa casa','limp casa','perfume ambiente',
                      'perfume lar','perfume casa','perfume multiuso','mist di amore',
                      'agua sanitaria','sabao em po','sabao liquido','desinfetante',
@@ -11164,7 +11165,7 @@ const _CATMAP = {
                      'pinho','cloro','sanitaria','brilhante','omo','ariel','ace',
                      'comfort','downy','ype','minuano','bombril'],
 
-    // Cosméticos
+    // Cosméticos — "creme facial/corporal" ANTES de qualquer outro "creme"
     'Cosméticos':   ['💅','creme facial','creme corporal','hidratante facial','protetor facial','base facial',
                      'batom','rimel','esmalte','antissinais','maquiagem',
                      'creme dental','pasta de dente','colonia','perfume feminino','perfume masculino',
@@ -11176,45 +11177,32 @@ const _CATMAP = {
                      'locao corporal','talco','protetor solar','nivea','clear shampoo','head shoulders',
                      'pantene','dove','johnson'],
 
-    // Açougue — frases longas ANTES para "file de frango" ganhar de "frango" simples
-    'Açougue':      ['🥩',
-                     'file de peito','file de frango','carne moida','ave bov','avebov',
-                     'bacon extra','bacon','salsicha','linguica',
-                     'acem','alcatra','contrafile','costela','picanha','pernil','presunto','mortadela',
-                     'calabresa','hamburguer','hambúrguer','almondega','charque','cupim','patinho','paleta','lombo',
-                     'tilapia','sardinha','atum','peixe','camarao',
-                     'frango','carne','file','steak','fatia hungara','fatia húngara','sobrecoxa','coxa','peito frango'],
-
     // Congelados
     'Congelados':   ['🧊','pizza congelada','massa congelada','sorvete','nuggets','empanado','polpa','picole',
                      'hamburguer congelado','file congelado'],
 
-    // Queijos
+    // Açougue
+    'Açougue':      ['🥩','acem','alcatra','frango','carne moida','bacon','salsicha','linguica','peixe',
+                     'camarao','file de frango','contrafile','costela','picanha','pernil','presunto','mortadela',
+                     'calabresa','hamburguer','hambúrguer','almondega','charque','cupim','patinho','paleta','lombo',
+                     'tilapia','sardinha','atum','ave bov','avebov'],
+
+    // Queijos — emoji 🧀, ANTES de Laticínios para "queijo" não pegar 🥛
     'Queijos':      ['🧀','queijo parmesao','queijo mussarela','queijo coalho','queijo ralado','queijo fatiado',
                      'queijo minas','queijo provolone','queijo gouda','queijo ricota','queijo prato',
                      'queijo','parmesao','mussarela','requeijao','ricota','coalho','president','presidente'],
 
-    // Ovos — ANTES de Laticínios
-    'Ovos':         ['🥚','ovos caipira','ovos granja','ovos brancos','ovos vermelhos','ovos vermel',
+    // Ovos — ANTES de Laticínios para não conflitar
+    'Ovos':          ['🥚','ovos caipira','ovos granja','ovos brancos','ovos vermelhos','ovos vermel',
                      'ovos pigmentado','ovos tipo','ovo caipira','ovo granja','ovos'],
 
-    // Laticínios
+    // Laticínios — leite e derivados líquidos → 🥛
     'Laticínios':   ['🥛','leite condensado','creme de leite','bebida lactea','leite uht','leite integral',
                      'leite desnatado','leite semidesnatado','leite em po','leite zero lactose','leite fermentado',
-                     'iogurte','bebida lactea','achocolatado nescau','nescau','toddy','ninho',
-                     'manteiga','nata','cremosinho','piracanjuba','italac','elege','leite'],
+                     'iogurte','manteiga','nata','cremosinho','piracanjuba','ninho','italac','elege','leite'],
 
-    // Bebidas — ANTES de Frutas para "suco de manga" não virar fruta
-    'Bebidas':      ['🥤',
-                     'suco de uva','suco de laranja','suco de manga','suco de maracuja','suco de abacaxi',
-                     'refresco','refrigerante','cerveja','vinho','energetico','isotonico',
-                     'coca-cola','coca cola','guarana','fanta','sprite','pepsi',
-                     'skol','brahma','antarctica','agua mineral','agua com gas',
-                     'cha gelado','cha pronto','cafe soluvel','nescafe','cafe',
-                     'refri','suco'],
-
-    // Frutas — apenas fruta in natura
-    'Frutas':       ['🍎','banana','maca','laranja','limao','abacaxi','mamao','melancia','uva',
+    // Frutas
+    'Frutas':       ['🍎','banana','maca','laranja','limao','abacaxi','manga','mamao','melancia','uva',
                      'pera','pessego','morango','coco','goiaba','maracuja','abacate','tangerina','acerola',
                      'kiwi','melao'],
 
@@ -11222,40 +11210,34 @@ const _CATMAP = {
     'Verduras':     ['🥬','alface','couve','espinafre','rucula','agriao','acelga','repolho','chicoria',
                      'cheiro verde','salsa','coentro','cebolinha','brocolis','vagem'],
 
-    // Legumes — "tomate" aqui só para in natura, produtos processados com tomate vão para Mercearia
-    'Legumes':      ['🥕','cenoura','beterraba','cebola','alho','batata doce','batata inglesa',
-                     'pimentao','abobrinha','chuchu','quiabo','berinjela','inhame','abobora',
-                     'pepino','tomate cereja','tomate salada','tomate'],
+    // Legumes
+    'Legumes':      ['🥕','tomate','pepino','cenoura','beterraba','cebola','alho','batata doce',
+                     'pimentao','abobrinha','chuchu','quiabo','berinjela','inhame','milho verde','abobora'],
 
     // Padaria
-    'Padaria':      ['🍞','pao frances','pao de forma','pao de hot dog','pao hamburguer',
-                     'bolo','rosca','torrada','broa','croissant','bisnaguinha','pao'],
+    'Padaria':      ['🍞','pao','bolo','rosca','torrada','broa','croissant','bisnaguinha'],
 
-    // Biscoitos / Snacks — "bis " com espaço move para Biscoitos (não Doces)
-    'Biscoitos':    ['🍪',
-                     'biscoito maria','biscoito maizena','biscoito agua sal','biscoito recheado',
-                     'biscoito treloso','biscoito','bolacha','cookie','cream cracker',
-                     'trakinas','oreo','wafer','rosquinha','passatempo','prestigio','negresco',
-                     'batata palha','batata chips','salgadinho','chips','amendoim torrado','snack',
-                     'nissin','tortilha','balas','bala ','bis apache','bis richester','bis '],
+    // Biscoitos / Snacks
+    'Biscoitos':    ['🍪','biscoito','bolacha','cookie','cream cracker','trakinas','oreo','wafer',
+                     'rosquinha','passatempo','prestigio','negresco','batata palha','batata chips',
+                     'salgadinho','chips','amendoim torrado','snack'],
 
     // Doces
-    'Doces':        ['🍫','chocolate ao leite','barra de chocolate','bombom',
-                     'pacoca','doce de leite','goiabada','geleia','mel','rapadura','cocada',
-                     'nutella','lacta','serenata','bom bom','zazam','chocolate'],
+    'Doces':        ['🍫','chocolate','nutella','bombom','barra de chocolate','pacoca','doce de leite',
+                     'goiabada','geleia','mel','rapadura','cocada','lacta','bis '],
+
+    // Bebidas
+    'Bebidas':      ['🥤','suco','refrigerante','cerveja','vinho','cha','energetico','isotonico',
+                     'achocolatado','nescau','toddy','coca-cola','coca cola','guarana','fanta','sprite',
+                     'pepsi','skol','brahma','antarctica','agua mineral','cafe','nescafe'],
 
     // Mercearia — genérico, fica por último
-    'Mercearia':    ['🛒',
-                     'molho de tomate','extrato de tomate','molho shoyu','molho ingles',
-                     'farofa de mandioca','farofa de milho','farinha de mandioca','farinha de trigo',
-                     'oleo de soja','oleo de girassol','oleo de milho',
-                     'milho verde vidro','milho verde lata','milho verde enlatado',
+    'Mercearia':    ['🛒','farofa de mandioca','farofa de milho','farinha de mandioca','farinha de trigo',
                      'arroz','feijao','macarrao','farinha','acucar','sal','oleo','azeite','vinagre',
-                     'ketchup','maionese','mostarda','tempero','caldo',
-                     'flocao','aveia','granola','gelatina','amido','polvilho','trigo','fuba',
+                     'molho de tomate','extrato de tomate','ketchup','maionese','mostarda','tempero',
+                     'caldo','flocao','aveia','granola','gelatina','amido','polvilho','trigo','fuba',
                      'canjica','tapioca','macaxeira','mandioca','margarina','miojo','farofa','maizena',
-                     'fermento','mocoto','ervilha','milho','azeitona','pepino em conserva',
-                     'manga','refresco em po'],
+                     'fermento','mocoto','ervilha','milho','azeitona','pepino em conserva'],
   };
 
 function _inferirEmojiCat(nome){

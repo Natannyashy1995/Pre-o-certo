@@ -11262,22 +11262,45 @@ function _inferirEmojiCat(nome){
 // ─── CORRIGIR EMOJI+CATEGORIA DE PRODUTOS EXISTENTES (botão admin) ───────────
 async function corrigirEmojiCategoriaDb(){
   if(!confirm('Corrigir emoji e categoria de todos os produtos no banco? Pode demorar.')) return;
-  let corrigidos = 0, erros = 0;
+  let corrigidos = 0, erros = 0, pulados = 0;
   showToast('Corrigindo produtos...','⏳');
+
+  // Emojis genéricos — só corrigir estes. Se já tiver emoji específico, respeitar.
+  const EMOJIS_GENERICOS = new Set(['🛒','📦','❓','']);
+  const CATS_GENERICAS = new Set(['Geral','Outros','','Mercearia']);
+
   for(const p of db.produtos){
+    const emojiAtual = p.emoji || '';
+    const catAtual = p.categoria || '';
+
+    // Se já tem emoji específico (não genérico), NÃO sobrescrever — respeita correção da IA
+    const emojiEspecifico = !EMOJIS_GENERICOS.has(emojiAtual);
+    const catEspecifica = !CATS_GENERICAS.has(catAtual);
+    if(emojiEspecifico && catEspecifica){ pulados++; continue; }
+
     const { categoria, emoji } = _inferirEmojiCat(p.nome);
-    if(p.categoria === categoria && p.emoji === emoji) continue;
+
+    // Só atualizar se o _inferirEmojiCat encontrou algo melhor que genérico
+    const melhorou = !EMOJIS_GENERICOS.has(emoji) || !CATS_GENERICAS.has(categoria);
+    if(!melhorou){ pulados++; continue; }
+
+    // Não sobrescrever campo que já está correto individualmente
+    const novoEmoji    = emojiEspecifico  ? emojiAtual : emoji;
+    const novaCategoria = catEspecifica   ? catAtual   : categoria;
+
+    if(novoEmoji === emojiAtual && novaCategoria === catAtual){ pulados++; continue; }
+
     try {
       await apiReq('PUT','/api/admin/produtos/'+(p._id||p.id),{
-        nome:p.nome, categoria, emoji,
+        nome:p.nome, categoria:novaCategoria, emoji:novoEmoji,
         unidade:p.unidade||'un', ativo:true
       });
-      p.categoria = categoria;
-      p.emoji = emoji;
+      p.categoria = novaCategoria;
+      p.emoji = novoEmoji;
       corrigidos++;
     } catch(e){ erros++; }
   }
-  showToast(corrigidos+' produto(s) corrigido(s)'+(erros?' | '+erros+' erro(s)':''),'✅');
+  showToast(`${corrigidos} corrigido(s) | ${pulados} já OK | ${erros} erro(s)`,'✅');
   renderAdminForm();
 }
 

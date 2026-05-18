@@ -6938,6 +6938,7 @@ function renderAdminForm(){
       <!-- FERRAMENTAS DE MANUTENÇÃO (sempre visíveis) -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button onclick="corrigirEmojiCategoriaDb()" style="background:#8B5CF6;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Corrigir Emoji/Cat</button>
+        <button onclick="corrigirComIA()" id="btnCorrigirIA" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🤖 Corrigir com IA</button>
         <button onclick="limparPrecosOrfaos()" style="background:#F59E0B;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Limpar Preços Órfãos</button>
         <button onclick="reativarTodosProdutos()" style="background:#22C55E;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🔄 Recuperar Produtos</button>
         <button onclick="reconstruirProdutosOrfaos()" style="background:#EF4444;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🔧 Reconstruir Deletados</button>
@@ -11262,45 +11263,22 @@ function _inferirEmojiCat(nome){
 // ─── CORRIGIR EMOJI+CATEGORIA DE PRODUTOS EXISTENTES (botão admin) ───────────
 async function corrigirEmojiCategoriaDb(){
   if(!confirm('Corrigir emoji e categoria de todos os produtos no banco? Pode demorar.')) return;
-  let corrigidos = 0, erros = 0, pulados = 0;
+  let corrigidos = 0, erros = 0;
   showToast('Corrigindo produtos...','⏳');
-
-  // Emojis genéricos — só corrigir estes. Se já tiver emoji específico, respeitar.
-  const EMOJIS_GENERICOS = new Set(['🛒','📦','❓','']);
-  const CATS_GENERICAS = new Set(['Geral','Outros','','Mercearia']);
-
   for(const p of db.produtos){
-    const emojiAtual = p.emoji || '';
-    const catAtual = p.categoria || '';
-
-    // Se já tem emoji específico (não genérico), NÃO sobrescrever — respeita correção da IA
-    const emojiEspecifico = !EMOJIS_GENERICOS.has(emojiAtual);
-    const catEspecifica = !CATS_GENERICAS.has(catAtual);
-    if(emojiEspecifico && catEspecifica){ pulados++; continue; }
-
     const { categoria, emoji } = _inferirEmojiCat(p.nome);
-
-    // Só atualizar se o _inferirEmojiCat encontrou algo melhor que genérico
-    const melhorou = !EMOJIS_GENERICOS.has(emoji) || !CATS_GENERICAS.has(categoria);
-    if(!melhorou){ pulados++; continue; }
-
-    // Não sobrescrever campo que já está correto individualmente
-    const novoEmoji    = emojiEspecifico  ? emojiAtual : emoji;
-    const novaCategoria = catEspecifica   ? catAtual   : categoria;
-
-    if(novoEmoji === emojiAtual && novaCategoria === catAtual){ pulados++; continue; }
-
+    if(p.categoria === categoria && p.emoji === emoji) continue;
     try {
       await apiReq('PUT','/api/admin/produtos/'+(p._id||p.id),{
-        nome:p.nome, categoria:novaCategoria, emoji:novoEmoji,
+        nome:p.nome, categoria, emoji,
         unidade:p.unidade||'un', ativo:true
       });
-      p.categoria = novaCategoria;
-      p.emoji = novoEmoji;
+      p.categoria = categoria;
+      p.emoji = emoji;
       corrigidos++;
     } catch(e){ erros++; }
   }
-  showToast(`${corrigidos} corrigido(s) | ${pulados} já OK | ${erros} erro(s)`,'✅');
+  showToast(corrigidos+' produto(s) corrigido(s)'+(erros?' | '+erros+' erro(s)':''),'✅');
   renderAdminForm();
 }
 
@@ -11764,6 +11742,24 @@ if('serviceWorker' in navigator){
     }
   }
 })();
+
+
+// ── Corrigir emoji/categoria com IA (lote) ──────────────────────────────────
+async function corrigirComIA(){
+  const btn = document.getElementById('btnCorrigirIA');
+  if(btn){ btn.disabled=true; btn.textContent='🤖 Processando...'; }
+  try {
+    showToast('IA analisando produtos... pode levar até 30 segundos','🤖');
+    const res = await apiReq('POST','/api/admin/corrigir-emoji-ia',{});
+    showToast(res.msg || `${res.corrigidos} produto(s) corrigido(s) pela IA ✅`,'✅');
+    await carregarDadosAdmin();
+    renderAdminForm();
+  } catch(e){
+    showToast('Erro: '+e.message,'❌');
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='🤖 Corrigir com IA'; }
+  }
+}
 
 // Inicia o app
 inicializarApp();

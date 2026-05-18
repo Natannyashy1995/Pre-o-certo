@@ -1494,14 +1494,14 @@ Produto: "${nome}"
 
 Responda APENAS o JSON, sem texto adicional.`;
 
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_KEY}`, {
+    const r = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=\${GEMINI_KEY}\`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents:[{ parts:[{ text: prompt }] }], generationConfig:{ temperature:0, maxOutputTokens:60 } })
     });
     const data = await r.json();
     const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const clean = txt.replace(/```json|```/g,'').trim();
+    const clean = txt.replace(/\`\`\`json|\`\`\`/g,'').trim();
     const parsed = JSON.parse(clean);
     if (parsed.emoji && parsed.categoria && CATS_VALIDAS.includes(parsed.categoria)) {
       return parsed;
@@ -1510,41 +1510,32 @@ Responda APENAS o JSON, sem texto adicional.`;
   return null;
 }
 
-// ── Admin: Corrigir emoji/categoria de todos os produtos genéricos com IA ───
+// ── Admin: Corrigir emoji/categoria de produtos genéricos com IA em lote ────
 app.post('/api/admin/corrigir-emoji-ia', adminAuth, async (req, res) => {
   try {
     if (!GEMINI_KEY) return res.status(503).json({ erro: 'GEMINI_API_KEY não configurada' });
-    // Buscar produtos com emoji genérico ou categoria genérica
     const produtos = await Produto.find({
       ativo: true,
       $or: [
         { emoji: { $in: ['📦','🛒','','❓'] } },
+        { emoji: { $exists: false } },
         { categoria: { $in: ['Geral','','Outros','Mercearia'] } }
       ]
-    }).limit(50); // processa 50 por vez para não estourar rate limit
+    }).limit(50);
 
-    let corrigidos = 0;
-    const erros = [];
-
+    let corrigidos = 0, erros = 0;
     for (const p of produtos) {
       const resultado = await inferirEmojiCatIA(p.nome);
       if (resultado) {
         await Produto.findByIdAndUpdate(p._id, { emoji: resultado.emoji, categoria: resultado.categoria });
         corrigidos++;
       } else {
-        erros.push(p.nome);
+        erros++;
       }
-      // Pequeno delay para não bater rate limit do Gemini
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(r => setTimeout(r, 200));
     }
-
-    res.json({
-      ok: true,
-      total: produtos.length,
-      corrigidos,
-      erros: erros.length,
-      msg: `${corrigidos} produto(s) corrigido(s) pela IA. ${erros.length} erro(s).`
-    });
+    res.json({ ok:true, total:produtos.length, corrigidos, erros,
+      msg: `${corrigidos} produto(s) corrigido(s) pela IA. ${erros} erro(s). ${produtos.length-corrigidos-erros} sem alteração.` });
   } catch(e) {
     res.status(500).json({ erro: e.message });
   }
@@ -1578,17 +1569,7 @@ app.post('/api/produtos', adminAuth, async (req, res) => {
     if (jaExiste) {
       return res.status(409).json({ erro: 'Produto já existe no catálogo: "' + jaExiste.nome + '"', id: jaExiste._id });
     }
-    // Se emoji ou categoria não fornecidos, tentar inferir com IA
-    let emojiFinal = emoji || null;
-    let catFinal = categoria || null;
-    if (!emojiFinal || !catFinal) {
-      const iaResult = await inferirEmojiCatIA(nomeClean);
-      if (iaResult) {
-        emojiFinal = emojiFinal || iaResult.emoji;
-        catFinal = catFinal || iaResult.categoria;
-      }
-    }
-    const p = await Produto.create({ nome: nomeClean, emoji: emojiFinal||'📦', categoria: catFinal||'Mercearia' });
+    const p = await Produto.create({ nome: nomeClean, emoji:emoji||'📦', categoria:categoria||'Geral' });
     res.status(201).json(p);
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });

@@ -746,9 +746,6 @@ setTimeout(function(){hideSplash();
       </button>
     </div>
 
-  </div>
-</div>
-
 
 <!-- ── CHAT FLUTUANTE NA TELA DE LOGIN ── -->
 <div id="loginChatFab">
@@ -824,7 +821,10 @@ setTimeout(function(){hideSplash();
     <div style="font-size:9px;color:#aaa;text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Patrocinado</div>
     <div id="propagandaConteudoHome"></div>
   </div>
-  <div class="floating-preview" id="floatingCards"></div>
+  <div id="floatingCardsSection" style="display:none">
+    <div class="promo-home-title" style="padding-bottom:4px;">💰 Menores preços hoje</div>
+    <div class="floating-preview" id="floatingCards"></div>
+  </div>
 </div>
 
 <!-- BUSCA -->
@@ -4183,15 +4183,18 @@ function renderHome(){
     }).join('');
   }else{sec.style.display='none';}
   const pendentes=db.contribuicoes.filter(c=>c.status==='pendente').length;
-  document.getElementById('floatingCards').innerHTML=db.produtos.slice(0,3).map(p=>{
+  const cardsHTML=db.produtos.slice(0,3).map(p=>{
     const precos=db.precos.filter(pr=>String(pr.produtoId)===String(p.id));
     if(!precos.length)return'';
     const min=Math.min(...precos.map(pr=>pr.preco));
     const prMin=precos.find(pr=>pr.preco===min);
     const merc=db.mercados.find(m=>String(m._id||m.id)===String(prMin.mercadoId));
     const f=freshnessInfo(prMin.dataAtu);
-    return`<div class="preview-card"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">+ barato</span></div></div>`;
-  }).join('');
+    return`<div class="preview-card" onclick="verDetalhe('${p.id||p._id}')"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">+ barato</span></div></div>`;
+  }).filter(Boolean).join('');
+  const secCards=document.getElementById('floatingCardsSection');
+  document.getElementById('floatingCards').innerHTML=cardsHTML;
+  if(secCards) secCards.style.display=cardsHTML?'':'none';
 }
 
 // ===== BUSCA =====

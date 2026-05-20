@@ -4183,13 +4183,14 @@ function renderHome(){
     }).join('');
   }else{sec.style.display='none';}
   const pendentes=db.contribuicoes.filter(c=>c.status==='pendente').length;
-  // Pegar todos os preços com dataAtu, ordenar do mais recente para o mais antigo
+  // Menores preços hoje: só produtos com dataAtu = hoje (< 24h), até 40, do mais recente
   const parseData=d=>{if(!d)return 0;const[dia,mes,ano]=d.split('/');return new Date(ano,mes-1,dia).getTime();};
+  const diffDias=d=>{if(!d)return 999;const[dia,mes,ano]=d.split('/');return Math.floor((new Date()-new Date(ano,mes-1,dia))/(1000*60*60*24));};
   const precosRecentes=[...db.precos].sort((a,b)=>parseData(b.dataAtu)-parseData(a.dataAtu));
-  // Pegar os 3 produtos distintos com preço mais recente
   const vistos=new Set();
-  const top3=[];
+  const topHoje=[];
   for(const pr of precosRecentes){
+    if(diffDias(pr.dataAtu)>0)continue;
     const pid=String(pr.produtoId);
     if(vistos.has(pid))continue;
     const p=db.produtos.find(x=>String(x.id||x._id)===pid);
@@ -4199,11 +4200,11 @@ function renderHome(){
     const min=Math.min(...precosProd.map(x=>x.preco));
     const prMin=precosProd.find(x=>x.preco===min);
     const merc=db.mercados.find(m=>String(m._id||m.id)===String(prMin.mercadoId));
-    top3.push({p,min,merc,dataAtu:pr.dataAtu});
-    if(top3.length===3)break;
+    topHoje.push({p,min,merc});
+    if(topHoje.length===40)break;
   }
-  const cardsHTML=top3.map(({p,min,merc})=>
-    `<div class="preview-card" onclick="verDetalhe('${p.id||p._id}')"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">+ barato</span></div></div>`
+  const cardsHTML=topHoje.map(({p,min,merc})=>
+    `<div class="preview-card" onclick="verDetalhe('${p.id||p._id}')"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">hoje</span></div></div>`
   ).join('');
   const secCards=document.getElementById('floatingCardsSection');
   document.getElementById('floatingCards').innerHTML=cardsHTML;

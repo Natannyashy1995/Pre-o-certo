@@ -4183,15 +4183,28 @@ function renderHome(){
     }).join('');
   }else{sec.style.display='none';}
   const pendentes=db.contribuicoes.filter(c=>c.status==='pendente').length;
-  const cardsHTML=db.produtos.slice(0,3).map(p=>{
-    const precos=db.precos.filter(pr=>String(pr.produtoId)===String(p.id));
-    if(!precos.length)return'';
-    const min=Math.min(...precos.map(pr=>pr.preco));
-    const prMin=precos.find(pr=>pr.preco===min);
+  // Pegar todos os preços com dataAtu, ordenar do mais recente para o mais antigo
+  const parseData=d=>{if(!d)return 0;const[dia,mes,ano]=d.split('/');return new Date(ano,mes-1,dia).getTime();};
+  const precosRecentes=[...db.precos].sort((a,b)=>parseData(b.dataAtu)-parseData(a.dataAtu));
+  // Pegar os 3 produtos distintos com preço mais recente
+  const vistos=new Set();
+  const top3=[];
+  for(const pr of precosRecentes){
+    const pid=String(pr.produtoId);
+    if(vistos.has(pid))continue;
+    const p=db.produtos.find(x=>String(x.id||x._id)===pid);
+    if(!p)continue;
+    vistos.add(pid);
+    const precosProd=db.precos.filter(x=>String(x.produtoId)===pid);
+    const min=Math.min(...precosProd.map(x=>x.preco));
+    const prMin=precosProd.find(x=>x.preco===min);
     const merc=db.mercados.find(m=>String(m._id||m.id)===String(prMin.mercadoId));
-    const f=freshnessInfo(prMin.dataAtu);
-    return`<div class="preview-card" onclick="verDetalhe('${p.id||p._id}')"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">+ barato</span></div></div>`;
-  }).filter(Boolean).join('');
+    top3.push({p,min,merc,dataAtu:pr.dataAtu});
+    if(top3.length===3)break;
+  }
+  const cardsHTML=top3.map(({p,min,merc})=>
+    `<div class="preview-card" onclick="verDetalhe('${p.id||p._id}')"><span style="font-size:22px;">${p.emoji}</span><div class="preview-info"><div class="preview-name">${p.nome}</div><div class="preview-mercado">${merc?merc.nome:''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-family:var(--font-title);font-weight:700;font-size:14px;color:var(--verde);">R$ ${fmt(min)}</span><span class="badge-menor">+ barato</span></div></div>`
+  ).join('');
   const secCards=document.getElementById('floatingCardsSection');
   document.getElementById('floatingCards').innerHTML=cardsHTML;
   if(secCards) secCards.style.display=cardsHTML?'':'none';

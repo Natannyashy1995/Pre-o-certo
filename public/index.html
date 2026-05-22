@@ -629,6 +629,10 @@ setTimeout(function(){hideSplash();
         <div class="lf"><span class="lf-ic">👤</span><input type="text" id="loginClienteUser" placeholder="Seu login" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
         <div class="lf"><span class="lf-ic">🔑</span><input type="password" id="loginClienteSenha" placeholder="Sua senha" onkeydown="if(event.key==='Enter')fazerLoginUnificado()"></div>
         <div class="login-erro" id="loginClienteErro">⚠️ Login ou senha incorretos</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--muted);user-select:none;padding:2px 0;">
+          <input type="checkbox" id="checkLembrarMe" style="width:16px;height:16px;accent-color:var(--azul);cursor:pointer;">
+          Lembrar-me neste dispositivo
+        </label>
         <button class="btn-azul" onclick="fazerLoginUnificado()" style="font-size:15px;padding:14px;">🔑 Entrar</button>
       </div>
 
@@ -1824,7 +1828,26 @@ async function carregarDadosBackend(){
   }
 }
 
-function salvarToken(token){ apiToken = token; }
+function salvarToken(token){
+  apiToken = token;
+  // Persiste token + dados do usuário se "lembrar-me" estiver marcado
+  const lembrar = document.getElementById('checkLembrarMe');
+  if(lembrar && lembrar.checked){
+    localStorage.setItem('pc_token', token);
+    localStorage.setItem('pc_lembrar', '1');
+  }
+}
+function salvarSessaoLembrada(dados){
+  // Salva dados do usuário para restaurar sem nova chamada ao servidor
+  if(localStorage.getItem('pc_lembrar')==='1'){
+    localStorage.setItem('pc_sessao', JSON.stringify(dados));
+  }
+}
+function limparSessaoLembrada(){
+  localStorage.removeItem('pc_token');
+  localStorage.removeItem('pc_lembrar');
+  localStorage.removeItem('pc_sessao');
+}
 function limparToken(){ apiToken = null; localStorage.removeItem('pc_token'); sessionStorage.removeItem('pc_token'); }
 
 // ═══════════════════════════════════════════════
@@ -2883,7 +2906,7 @@ async function alterarSenhaAdmin(){
   } catch(e){ showToast('Erro: '+e.message,'❌'); }
 }
 
-function fazerLogout(){adminLogado=false;adminUser=null;mercadoLogado=null;clienteLogado=null;limparToken();irPara('home');}
+function fazerLogout(){adminLogado=false;adminUser=null;mercadoLogado=null;clienteLogado=null;limparSessaoLembrada();limparToken();irPara('home');}
 
 // ===== LOG SYSTEM =====
 function adicionarLog(tipo, descricao, usuario){
@@ -2908,8 +2931,9 @@ async function fazerLoginUnificado(){
       irPara('admin');
       showToast(`Bem-vindo, ${d.nome}! 🛡️`, '✅');
     } else {
-      salvarToken(d.token, true);
+      salvarToken(d.token);
       clienteLogado = { login: d.login, nome: d.nome, bloqueado: d.bloqueado, motivoBloqueio: d.motivoBloqueio||'', emailVerificado: d.emailVerificado, bairro: d.bairro, telefone: d.telefone||'' };
+      salvarSessaoLembrada(clienteLogado);
       perfilNome = d.nome;
       sincronizarAvatar();
       irPara('home');
@@ -8484,6 +8508,7 @@ function abrirPerfilCliente(){
 function sairCliente(){
   if(!confirm('Sair da conta?'))return;
   clienteLogado=null;
+  limparSessaoLembrada();
   limparToken();
   location.reload();
 }
@@ -11603,6 +11628,25 @@ async function inicializarApp(){
     }, 3000);
   }
 
+  // Restaurar sessão lembrada (lembrar-me)
+  const tokenSalvo = localStorage.getItem('pc_token');
+  const lembrar = localStorage.getItem('pc_lembrar');
+  const sessaoSalva = localStorage.getItem('pc_sessao');
+  if(tokenSalvo && lembrar==='1' && sessaoSalva){
+    try {
+      apiToken = tokenSalvo;
+      clienteLogado = JSON.parse(sessaoSalva);
+      perfilNome = clienteLogado.nome;
+      sincronizarAvatar();
+      hideSplash();
+      carregarPropagandaBanner();
+      irPara('home');
+      renderHome();
+      return; // Não passa pela tela de login
+    } catch(e){
+      limparSessaoLembrada();
+    }
+  }
   limparToken();
   hideSplash();
   // Carregar banner de propaganda (não bloqueia o app)

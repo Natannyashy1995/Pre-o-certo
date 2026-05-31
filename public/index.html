@@ -5588,18 +5588,15 @@ async function processarFotoMultiplas(e){
     todosItens = todosItens.map(it => {
       const nome = it.produto || '';
       const preco = it.preco || 0;
-      const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i) || nome.match(/(\d{3,4})\s*g\b/i);
+      // Só corrige kg decimal não-redondo (balança). Não corrige 200g, 500g, 1kg de embalagem.
+      const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i);
       if(pesoMatch && preco > 0){
-        let pesoKg;
-        if(pesoMatch[0].toLowerCase().includes('kg')){
-          pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
-        } else {
-          pesoKg = parseInt(pesoMatch[1]) / 1000;
-        }
-        if(pesoKg > 0 && pesoKg < 5 && preco < 50){
+        const pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
+        const ehEmbalagem = (Math.round(pesoKg * 10) % 5 === 0);
+        if(pesoKg > 0 && pesoKg < 5 && preco < 50 && !ehEmbalagem){
           const precoKgCalc = Math.round((preco / pesoKg) * 100) / 100;
           if(precoKgCalc > preco){
-            const nomeCorr = nome.replace(/\s*\d+[.,]\d+\s*kg/gi,'').replace(/\s*\d{3,4}\s*g\b/gi,'').trim() + ' kg';
+            const nomeCorr = nome.replace(/\s*\d+[.,]\d+\s*kg/gi,'').trim() + ' kg';
             console.log(`[IA kg fix multi] "${nome}" R$${preco} → "${nomeCorr}" R$${precoKgCalc}/kg`);
             return { ...it, produto: nomeCorr, preco: precoKgCalc };
           }
@@ -5966,32 +5963,25 @@ async function analisarFotoComIA(){
     }
 
     // ── Correção automática preço/kg para etiquetas de balança ───────────────
-    // Se o nome contém peso (ex: "0.384kg") e preço parece ser o total,
-    // recalcula: preço/kg = total ÷ peso
+    // Só corrige pesos DECIMAIS não-redondos (ex: "0.384kg", "1,250kg") — sinal de balança.
+    // NÃO corrige gramagens de embalagem (200g, 500g, 1kg, 2kg) para evitar
+    // calcular preço/kg errado em produtos por unidade (ex: Creme de Leite 200g → R$22,45).
     if(resultado.itens){
       resultado.itens = resultado.itens.map(it => {
         const nome = it.produto || '';
         const preco = it.preco || 0;
-        // Detecta peso no nome: "0.384kg", "0,384 kg", "384g" etc
-        const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i) || nome.match(/(\d{3,4})\s*g/i);
+        // Detecta apenas kg decimal: "0.384kg", "0,384 kg", "1.250kg"
+        // NÃO detecta gramagens de embalagem (200g, 500g) — apenas kg decimais
+        const pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i);
         if(pesoMatch && preco > 0){
-          let pesoKg;
-          if(pesoMatch[0].toLowerCase().includes('kg')){
-            pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
-          } else {
-            // gramas → kg
-            pesoKg = parseInt(pesoMatch[1]) / 1000;
-          }
-          // Só corrige se o peso parece ser do pacote (< 5kg) e preço < 50
-          // Preço/kg calculado deve ser maior que o preço total (sinal de que total foi usado)
-          if(pesoKg > 0 && pesoKg < 5 && preco < 50){
+          const pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
+          // Múltiplos de 0.5 são pesos de embalagem padrão (0.5, 1.0, 1.5, 2.0...) — não corrigir
+          const ehEmbalagem = (Math.round(pesoKg * 10) % 5 === 0);
+          if(pesoKg > 0 && pesoKg < 5 && preco < 50 && !ehEmbalagem){
             const precoKgCalculado = Math.round((preco / pesoKg) * 100) / 100;
-            // Só aplica se o preço/kg calculado for maior (confirma que pegou o total)
             if(precoKgCalculado > preco){
-              // Remove o peso do nome
               const nomeCorrigido = nome
                 .replace(/\s*\d+[.,]\d+\s*kg/gi, '')
-                .replace(/\s*\d{3,4}\s*g/gi, '')
                 .trim()
                 + ' kg';
               console.log(`[IA kg fix] "${nome}" R$${preco} → "${nomeCorrigido}" R$${precoKgCalculado}/kg`);
@@ -6001,7 +5991,7 @@ async function analisarFotoComIA(){
         }
         return it;
       });
-    }
+  }
 
     // ── Filtro pós-IA: remove itens genéricos/inválidos/inventados ─────────
     const NOMES_PROIBIDOS = /^(produto\s*diverso|diversos?|item|mercadoria|outros?|variado|n[aã]o\s*identificad|desconhecido|produto|various|misc)$/i;
@@ -6076,7 +6066,10 @@ async function analisarFotoComIA(){
           </div>
         </div>`;
       }).join('');
-      window._iaMultiItens = resultado.itens;
+      // Deduplicação antes de salvar (evita envio múltiplo do mesmo produto)
+      const _dedupMap = {};
+      resultado.itens.forEach(it => { const k=(it.produto||'').toLowerCase().replace(/\s+/g,'').substring(0,30)+'_'+it.preco.toFixed(2); if(!_dedupMap[k]) _dedupMap[k]=it; });
+      window._iaMultiItens = Object.values(_dedupMap);
       window._iaMultiMercado = resultado.mercado;
       document.getElementById('aiResultContent').innerHTML=`
         <div style="background:#DCFCE7;border:1.5px solid #22C55E40;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
@@ -6204,10 +6197,15 @@ async function enviarItemMulti(idx){
 }
 
 async function enviarTodosMulti(){
-  if(!clienteLogado||clienteLogado.bloqueado){showToast('Conta bloqueada.','🔒');return;}
+  if(window._enviandoTodosMulti){showToast('Aguarde, já está enviando...','⏳');return;}
+  window._enviandoTodosMulti = true;
+  // Desabilita botão imediatamente para evitar double-tap
+  document.querySelectorAll('[onclick="enviarTodosMulti()"]').forEach(b=>{b.disabled=true;b.textContent='⏳ Enviando...';});
+  try {
+  if(!clienteLogado||clienteLogado.bloqueado){showToast('Conta bloqueada.','🔒');window._enviandoTodosMulti=false;return;}
   const _mA2=document.getElementById('fotoMercadoAntes'),_mS2=document.getElementById('fotoMercadoMulti');
   const mercId=(_mA2&&_mA2.value)||(_mS2&&_mS2.value)||'';
-  if(!mercId){showToast('Selecione o mercado antes de enviar!','⚠️');return;}
+  if(!mercId){showToast('Selecione o mercado antes de enviar!','⚠️');window._enviandoTodosMulti=false;document.querySelectorAll('[onclick="enviarTodosMulti()"]').forEach(b=>{b.disabled=false;b.textContent='📤 Enviar Todos que Forem do Catálogo';});return;}
   const mercObj=db.mercados.find(m=>String(m._id||m.id)===mercId),mercNome=mercObj?mercObj.nome:'';
   const itensRaw=window._iaMultiItens||[];
   const normB=s=>(s||'').replace(/\s*\(varejo\)/gi,'').replace(/\s*\(a partir de[^)]*\)/gi,'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -6223,6 +6221,7 @@ async function enviarTodosMulti(){
   document.querySelectorAll('[onclick^="enviarItemMulti"],[onclick^="solicitarNovoProdutoIA"]').forEach(b=>{b.disabled=true;b.textContent='✅ Processado';b.style.background='var(--muted)';});
   const p=[];if(enviados)p.push(enviados+' enviado(s)');if(solicitados)p.push(solicitados+' solicitado(s)');if(erros)p.push(erros+' erro(s)');
   showToast(p.length?p.join(' · ')+' — obrigado! 🙏':'Nenhum item processado.',p.length?'📸':'⚠️');
+  } finally { window._enviandoTodosMulti = false; }
 }
 
 // ─── SOLICITAR CADASTRO DE NOVO PRODUTO (quando IA identifica produto fora do catálogo) ───
@@ -9172,15 +9171,15 @@ Resposta começa com { e termina com }.`;
       resultado.itens = resultado.itens.map(function(item){
         var nome = item.produto || '';
         var preco = item.preco || 0;
-        var pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i) || nome.match(/(\d{3,4})\s*g\b/i);
+        // Só corrige kg decimal não-redondo (balança). Não corrige 200g, 500g, 1kg de embalagem.
+        var pesoMatch = nome.match(/(\d+[.,]\d+)\s*kg/i);
         if(pesoMatch && preco > 0){
-          var pesoKg = pesoMatch[0].toLowerCase().includes('kg')
-            ? parseFloat(pesoMatch[1].replace(',','.'))
-            : parseInt(pesoMatch[1]) / 1000;
-          if(pesoKg > 0 && pesoKg < 5 && preco < 50){
+          var pesoKg = parseFloat(pesoMatch[1].replace(',','.'));
+          var ehEmbalagem = (Math.round(pesoKg * 10) % 5 === 0);
+          if(pesoKg > 0 && pesoKg < 5 && preco < 50 && !ehEmbalagem){
             var precoKg = Math.round((preco / pesoKg) * 100) / 100;
             if(precoKg > preco){
-              var nomeCorr = nome.replace(/\s*\d+[.,]\d+\s*kg/gi,'').replace(/\s*\d{3,4}\s*g\b/gi,'').trim() + ' kg';
+              var nomeCorr = nome.replace(/\s*\d+[.,]\d+\s*kg/gi,'').trim() + ' kg';
               console.log('[Admin kg fix] "'+nome+'" R$'+preco+' → "'+nomeCorr+'" R$'+precoKg+'/kg');
               return Object.assign({}, item, { produto: nomeCorr, preco: precoKg });
             }

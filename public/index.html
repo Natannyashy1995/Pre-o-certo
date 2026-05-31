@@ -6443,21 +6443,6 @@ function renderPortal(){
       <div><div class="field-label">Descrição</div><input type="text" class="input-field" id="mPromoDesc" placeholder="Ex: Oferta especial!"></div>
       <button class="btn-primary" onclick="mercadoCriarPromo()">🔥 Publicar Promoção</button>
 
-      <!-- Impulsionamento -->
-      <div style="background:linear-gradient(135deg,#7C3AED18,#5B21B618);border:2px solid #7C3AED40;border-radius:13px;padding:14px;margin-top:4px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:26px;">🚀</span>
-          <div>
-            <div style="font-family:var(--font-title);font-weight:800;font-size:14px;color:#5B21B6;">Impulsionar Produto</div>
-            <div style="font-size:11px;color:#7C3AED;">Destaque na 1ª posição da busca por 24h — R$ 5,00</div>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#4C1D95;line-height:1.6;margin-bottom:10px;">
-          🏆 Seu produto aparece <strong>na primeira fila da busca</strong> por 24h com badge 🚀 IMPULSIONADO.<br>
-          📲 Solicite pelo WhatsApp — ativação manual pela nossa equipe.
-        </div>
-        <button onclick="solicitarImpulsionamento()" style="width:100%;background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;border:none;border-radius:10px;padding:12px;font-family:var(--font-title);font-weight:700;font-size:13px;cursor:pointer;">💥 Solicitar Impulsionamento — R$ 5,00</button>
-      </div>
 
       ${minhasPromos.length?`<div style="font-family:var(--font-title);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:6px;">Minhas promoções ativas (${minhasPromos.length})</div>${minhasPromos.map(pr=>{const prod=db.produtos.find(p=>String(p.id)===String(pr.produtoId)||String(p._id)===String(pr.produtoId));return`<div style="background:#fff;border:1.5px solid var(--borda);border-radius:12px;padding:12px;box-shadow:0 1px 4px rgba(11,79,138,.06);"><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;font-size:13px;">${prod?prod.emoji+' '+prod.nome:'?'}</span><button onclick="removerPromo(\`${pr.id||pr._id}\`)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;">🗑️</button></div><div style="font-size:12px;color:var(--amarelo);margin-top:4px;font-weight:700;">R$ ${fmt(pr.precoNormal)} → R$ ${fmt(pr.precoPromo)} • Até ${pr.validade}</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">${pr.descricao}</div></div>`;}).join('')}`:`<div style="text-align:center;color:var(--muted);padding:20px 0;font-size:13px;">Nenhuma promoção ativa</div>`}`;
     setTimeout(()=>{
@@ -6545,28 +6530,72 @@ function renderPortal(){
       </div>`}
     `;
   }else if(portalTabAtiva==='impulsionar'){
+    // Impulsionamentos ativos deste mercado
+    const _agora = Date.now();
+    const meusImpulsos = (db.impulsionamentos||[]).filter(i=>String(i.mercadoId)===String(merc.id||merc._id) && i.expiraEm > _agora);
+    // Preços do mercado registrados hoje (aparecem em "Menores preços hoje")
+    const parseDataMerc=d=>{if(!d)return 0;const[dia,mes,ano]=d.split('/');return new Date(ano,mes-1,dia).getTime();};
+    const diffDiasMerc=d=>{if(!d)return 999;const[dia,mes,ano]=d.split('/');return Math.floor((_agora-new Date(ano,mes-1,dia))/(1000*60*60*24));};
+    const precosHoje = db.precos.filter(p=>String(p.mercadoId)===String(merc.id||merc._id) && diffDiasMerc(p.dataAtu)===0);
     body.innerHTML = `
-    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-      <div style="font-family:var(--font-title);font-weight:800;font-size:16px;color:var(--azul-esc);">🚀 Impulsionar Produto</div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Card solicitar -->
       <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:13px;padding:18px;text-align:center;color:#fff;">
         <div style="font-size:36px;margin-bottom:8px;">🚀</div>
         <div style="font-family:var(--font-title);font-weight:800;font-size:15px;margin-bottom:6px;">Destaque na 1ª posição</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.9);line-height:1.6;margin-bottom:12px;">Seu produto aparece no <strong>topo da busca</strong> por 24h com badge 🚀 para todos os usuários.</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.9);line-height:1.6;margin-bottom:12px;">Seu produto aparece no <strong>topo da busca e em Menores preços hoje</strong> por 24h com badge 🚀 para todos os usuários.</div>
         <div style="background:rgba(255,255,255,.15);border-radius:9px;padding:10px;font-size:13px;font-weight:700;margin-bottom:14px;">✅ Disponível para todos os planos — apenas R$ 5,00 por 24h</div>
         <button onclick="solicitarImpulsionamentoPainel()" style="background:#fff;color:#7C3AED;border:none;border-radius:11px;padding:13px 20px;font-family:var(--font-title);font-weight:800;font-size:14px;cursor:pointer;width:100%;">🚀 Solicitar Impulsionamento</button>
       </div>
+
+      <!-- Como funciona -->
       <div style="background:var(--card);border:1.5px solid var(--borda);border-radius:13px;padding:14px;">
         <div style="font-weight:700;font-size:13px;color:var(--azul-esc);margin-bottom:8px;">📋 Como funciona?</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.8;">
-          1️⃣ Clique em &quot;Solicitar Impulsionamento&quot;<br>
+          1️⃣ Clique em "Solicitar Impulsionamento"<br>
           2️⃣ Seu pedido vai para a equipe PreçoCerto via chat<br>
           3️⃣ Confirmamos e ativamos o destaque em até 2h<br>
-          4️⃣ Seu produto fica no topo por <strong>24 horas</strong>
+          4️⃣ Seu produto fica no topo da busca e em <strong>Menores preços hoje</strong> por 24h
         </div>
       </div>
-      <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:11px;padding:12px;font-size:11px;color:#92400E;text-align:center;">
-        💡 Para escolher qual produto impulsionar, acesse <strong>Meus Preços</strong> e selecione o produto desejado.
+
+      <!-- Impulsionamentos ativos -->
+      <div>
+        <div style="font-family:var(--font-title);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">🚀 Seus impulsionamentos ativos (${meusImpulsos.length})</div>
+        ${meusImpulsos.length ? meusImpulsos.map(i=>{
+          const prod = db.produtos.find(p=>String(p.id||p._id)===String(i.produtoId));
+          const restante = Math.max(0, Math.ceil((i.expiraEm - _agora)/3600000));
+          return `<div style="background:#fff;border:2px solid #7C3AED40;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:22px;">${prod?prod.emoji:'📦'}</span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:var(--texto);">${prod?prod.nome:'?'}</div>
+              <div style="font-size:11px;color:#7C3AED;margin-top:2px;">🚀 Impulsionado • expira em ${restante}h</div>
+            </div>
+            <span style="background:#7C3AED;color:#fff;border-radius:7px;padding:3px 8px;font-size:10px;font-weight:700;">ATIVO</span>
+          </div>`;
+        }).join('') : '<div style="text-align:center;color:var(--muted);padding:12px 0;font-size:13px;">Nenhum impulsionamento ativo no momento</div>'}
       </div>
+
+      <!-- Preços do mercado em "Menores preços hoje" -->
+      <div>
+        <div style="font-family:var(--font-title);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">💰 Seus preços em "Menores preços hoje" (${precosHoje.length})</div>
+        ${precosHoje.length ? precosHoje.map(p=>{
+          const prod = db.produtos.find(pr=>String(pr.id||pr._id)===String(p.produtoId));
+          return `<div style="background:#fff;border:1.5px solid var(--borda);border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:22px;">${prod?prod.emoji:'📦'}</span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:var(--texto);">${prod?prod.nome:'?'}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Atualizado hoje</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:var(--font-title);font-weight:900;font-size:15px;color:var(--verde);">R$ ${fmt(p.preco)}</div>
+              <span style="background:var(--verde);color:#fff;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;">hoje</span>
+            </div>
+          </div>`;
+        }).join('') : '<div style="text-align:center;color:var(--muted);padding:12px 0;font-size:13px;">Nenhum preço atualizado hoje ainda.<br><span style="font-size:11px;">Atualize um preço para aparecer aqui!</span></div>'}
+      </div>
+
     </div>`;
   } else if(portalTabAtiva==='suporte_merc'){
     // Chat de suporte para mercados — mesmo bot do cliente
@@ -10557,14 +10586,6 @@ function renderPlanos(){
       </div>
     </div>
 
-    <!-- Impulsionamento -->
-    <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:13px;padding:16px;text-align:center;">
-      <div style="font-size:22px;margin-bottom:6px;">🚀</div>
-      <div style="font-family:var(--font-title);font-weight:800;font-size:14px;color:#fff;margin-bottom:4px;">Impulsionar Produto</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.9);margin-bottom:6px;line-height:1.6;">Seu produto aparece na <strong>1ª posição da busca</strong> por 24h com badge 🚀 para todos os usuários.</div>
-      <div style="background:rgba(255,255,255,.15);border-radius:9px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#fff;font-weight:700;">✅ Disponível para todos os planos — apenas R$ 5,00 por 24h</div>
-      <button onclick="irPara('portalMercado');setTimeout(()=>setPortalTab('impulsionar'),300);" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);border-radius:9px;padding:10px 20px;font-family:var(--font-title);font-weight:700;font-size:13px;color:#fff;cursor:pointer;width:100%;">🚀 Solicitar no Painel</button>
-    </div>
 
     <!-- WhatsApp CTA -->
     <!-- Suporte CTA -->

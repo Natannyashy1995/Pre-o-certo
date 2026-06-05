@@ -163,6 +163,7 @@ const MercadoSchema = new mongoose.Schema({
   endereco:  { type: String, default: '' },
   bairro:    { type: String, default: 'Centro' },
   cidade:    { type: String, default: 'Piatã' },
+  estado:    { type: String, default: 'BA' },
   whatsapp:  { type: String, default: '' },
   website:   { type: String, default: null },
   parceiro:  { type: Boolean, default: false },
@@ -1438,7 +1439,7 @@ app.post('/api/admin/mercados', adminAuth, async (req, res) => {
   try {
     const { nome, icone, endereco, bairro, whatsapp, website, parceiro, plano, usuario, senha, lat, lng } = req.body;
     if (!nome) return res.status(400).json({ erro:'Nome é obrigatório' });
-    const dados = { nome, icone:icone||'🏪', endereco:endereco||'', bairro:bairro||'Centro', cidade:req.body.cidade||'Piatã', whatsapp:whatsapp||'', website:website||null, parceiro:!!parceiro, plano:plano||null, lat: lat != null ? parseFloat(String(lat).replace(',','.')) || null : null, lng: lng != null ? parseFloat(String(lng).replace(',','.')) || null : null };
+    const dados = { nome, icone:icone||'🏪', endereco:endereco||'', bairro:bairro||'Centro', cidade:req.body.cidade||'Piatã', estado:req.body.estado||'BA', whatsapp:whatsapp||'', website:website||null, parceiro:!!parceiro, plano:plano||null, lat: lat != null ? parseFloat(String(lat).replace(',','.')) || null : null, lng: lng != null ? parseFloat(String(lng).replace(',','.')) || null : null };
     if (usuario) dados.usuario = usuario;
     if (senha)   dados.senhaHash = await bcrypt.hash(senha, 10);
     const m = await Mercado.create(dados);
@@ -1450,7 +1451,7 @@ app.post('/api/admin/mercados', adminAuth, async (req, res) => {
 app.put('/api/admin/mercados/:id', adminAuth, async (req, res) => {
   try {
     const upd = {};
-    ['nome','icone','endereco','bairro','cidade','whatsapp','website','parceiro','plano','lat','lng','ativo','plusCode','nomeGoogleMaps'].forEach(c => {
+    ['nome','icone','endereco','bairro','cidade','estado','whatsapp','website','parceiro','plano','lat','lng','ativo','plusCode','nomeGoogleMaps'].forEach(c => {
       if (req.body[c] !== undefined) upd[c] = req.body[c];
     });
     if (req.body.senha) upd.senhaHash = await bcrypt.hash(req.body.senha, 10);
@@ -1472,6 +1473,49 @@ app.delete('/api/admin/mercados/:id', adminAuth, async (req, res) => {
     await registrarLog('admin', `Mercado ${id} excluído (${rPrecos.deletedCount} preços, ${rPromos.deletedCount} promos removidos)`, req.user.usuario, getIP(req));
     res.json({ mensagem:'Mercado e dados removidos', precos:rPrecos.deletedCount, promos:rPromos.deletedCount });
   } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+// ── GEOCODIFICAÇÃO DE ENDEREÇO (Nominatim, gratuito, sem API key) ────────────
+// Recebe endereço livre e devolve { cidade, estado, uf, lat, lng, display }
+app.get('/api/geocode-endereco', async (req, res) => {
+  const { endereco } = req.query;
+  if (!endereco || endereco.trim().length < 5)
+    return res.status(400).json({ erro: 'Endereço muito curto' });
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const q = encodeURIComponent(endereco.trim() + ', Brasil');
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${q}&addressdetails=1&limit=1&countrycodes=br`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'PrecoCerto/1.0 (app comunitario de precos)' }
+    });
+    if (!resp.ok) return res.status(502).json({ erro: 'Nominatim indisponível' });
+    const data = await resp.json();
+    if (!data.length) return res.status(404).json({ erro: 'Endereço não encontrado' });
+    const r = data[0];
+    const addr = r.address || {};
+    // Nominatim pode retornar cidade em campos diferentes
+    const cidade = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+    // Estado por extenso e UF
+    const estadoNome = addr.state || '';
+    const UF_MAP = {
+      'Acre':'AC','Alagoas':'AL','Amapá':'AP','Amazonas':'AM','Bahia':'BA','Ceará':'CE',
+      'Distrito Federal':'DF','Espírito Santo':'ES','Goiás':'GO','Maranhão':'MA','Mato Grosso':'MT',
+      'Mato Grosso do Sul':'MS','Minas Gerais':'MG','Pará':'PA','Paraíba':'PB','Paraná':'PR',
+      'Pernambuco':'PE','Piauí':'PI','Rio de Janeiro':'RJ','Rio Grande do Norte':'RN',
+      'Rio Grande do Sul':'RS','Rondônia':'RO','Roraima':'RR','Santa Catarina':'SC',
+      'São Paulo':'SP','Sergipe':'SE','Tocantins':'TO'
+    };
+    const uf = UF_MAP[estadoNome] || '';
+    return res.json({
+      cidade,
+      estado: estadoNome,
+      uf,
+      lat: parseFloat(r.lat),
+      lng: parseFloat(r.lon),
+      display: r.display_name
+    });
+  } catch (e) {
+    res.status(500).json({ erro: e.message });
+  }
 });
 
 // ── PRODUTOS ─────────────────────────────────────────────

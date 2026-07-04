@@ -277,6 +277,7 @@ const ChatMsgSchema = new mongoose.Schema({
   tipo:         { type: String, required: true }, // user | bot | admin | sistema
   texto:        { type: String, required: true },
   hora:         { type: String, required: true },
+  dadosCliente: { type: String, default: null },
   lida:         { type: Boolean, default: false },
   dadosCliente: { type: Object, default: null }, // preenchido quando cliente escala ou sai
 }, { timestamps: true });
@@ -2500,10 +2501,22 @@ app.get('/api/suporte/chats', adminAuth, async (req, res) => {
     const msgs = await ChatMsg.find().sort({ createdAt:-1 }).limit(500);
     const grupos = {};
     msgs.reverse().forEach(m => {
-      if (!grupos[m.clienteId]) grupos[m.clienteId] = [];
-      grupos[m.clienteId].push(m);
+      if (!grupos[m.clienteId]) grupos[m.clienteId] = { mensagens:[], aguardandoAtendente:false, dadosCliente:null, data:'' };
+      grupos[m.clienteId].mensagens.push(m);
+      if(!grupos[m.clienteId].data) grupos[m.clienteId].data = m.createdAt ? m.createdAt.toISOString().slice(0,10) : '';
+      if(m.tipo === 'escalado') {
+        grupos[m.clienteId].aguardandoAtendente = true;
+        try { grupos[m.clienteId].dadosCliente = m.dadosCliente ? JSON.parse(m.dadosCliente) : null; } catch(e){}
+      }
     });
-    res.json(Object.entries(grupos).map(([clienteId,mensagens]) => ({ clienteId, mensagens, aberto:true })));
+    res.json(Object.entries(grupos).map(([clienteId, d]) => ({
+      clienteId,
+      mensagens: d.mensagens,
+      aguardandoAtendente: d.aguardandoAtendente,
+      dadosCliente: d.dadosCliente,
+      aberto: true,
+      data: d.data,
+    })));
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 
@@ -2530,10 +2543,10 @@ app.post('/api/suporte/escalado', async (req, res) => {
 
     await ChatMsg.create({
       clienteId: clienteId||'visitante',
-      tipo: 'sistema',
+      tipo: 'escalado',
       texto: '[SOLICITOU_ATENDENTE]',
       hora: horaAtual(),
-      dadosCliente: dadosCliente||null,
+      dadosCliente: dadosCliente ? JSON.stringify(dadosCliente) : null,
     });
 
     notificarAdmins('atendimento_solicitado', {

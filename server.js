@@ -417,6 +417,29 @@ function validarPreco(p) {
 }
 app.use(express.urlencoded({ extended: true }));
 app.use((req,res,next)=>{res.setHeader('Cache-Control','no-cache,no-store,must-revalidate');res.setHeader('Pragma','no-cache');res.setHeader('Expires','0');next();});
+// ── MANIFEST.JSON dinâmico — garante display:standalone ─────────────────────
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.json({
+    name: 'PreçoCerto',
+    short_name: 'PreçoCerto',
+    description: 'Compare preços na sua cidade',
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#f0f4ff',
+    theme_color: '#1a56db',
+    lang: 'pt-BR',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+    ],
+    categories: ['shopping', 'utilities'],
+    screenshots: []
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (/\.(png|webp|ico)$/.test(filePath))
@@ -440,6 +463,9 @@ const iaLimiter      = rateLimit({ windowMs: 60*1000, max: 20,
 const iaAdminLimiter = rateLimit({ windowMs: 60*1000, max: 300,
   message: { erro: 'Limite admin IA atingido.' }
 });
+// ── PING (keep-alive e health check) ────────────────────────────────────────
+app.get('/api/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
+
 // ── DIGITAL ASSET LINKS (Play Store TWA — remove barra do navegador) ────────
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -3748,6 +3774,20 @@ app.get('/excluir-conta', (req, res) => {
 </body>
 </html>`);
 });
+
+// ── KEEP-ALIVE (evita sleep do Render no plano gratuito) ────────────────────
+// Faz ping a si mesmo a cada 14 minutos para não hibernar
+// O Render hiberna após 15min — isso mantém o servidor acordado
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+setInterval(async () => {
+  try {
+    const fetch = (await import('node-fetch')).default;
+    await fetch(SELF_URL + '/api/ping', { method: 'GET', timeout: 8000 });
+    console.log('[keep-alive] ping OK', new Date().toISOString());
+  } catch(e) {
+    console.log('[keep-alive] ping falhou:', e.message);
+  }
+}, 14 * 60 * 1000); // 14 minutos
 
 app.listen(PORT, () => {
   console.log(`

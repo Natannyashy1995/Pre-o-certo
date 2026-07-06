@@ -6339,15 +6339,43 @@ async function enviarTodosMulti(){
   const dedup={};
   itensRaw.forEach(it=>{const b=normB(it.produto||'');if(!dedup[b]||it.preco<dedup[b].preco)dedup[b]=it;});
   const itens=Object.values(dedup);
-  let enviados=0,solicitados=0,erros=0;
+  let enviados=0,solicitados=0,erros=0,ultimoErroLote='';
   for(const item of itens){const match=encontrarProdutoIA(item.produto);
-    if(match){try{await apiReq('POST','/api/contribuicoes',{tipo:'foto',produtoId:match._id||match.id,mercadoId:mercId,preco:item.preco,obs:'IA lote'});enviados++;}catch(e){erros++;}
-    }else{const nome=(item.produto||'').trim();if(!nome)continue;
-      try{await apiReq('POST','/api/solicitacao-produto',{nome:nome,preco:item.preco||0,mercadoId:mercId,mercadoNome:mercNome,obs:'IA lote - produto nao encontrado no catalogo.',autor:clienteLogado.nome||clienteLogado.login||'cliente'});solicitados++;}catch(e){erros++;console.warn('sol err:',e.message);}}
+    if(match){
+      try{
+        await apiReq('POST','/api/contribuicoes',{tipo:'foto',produtoId:match._id||match.id,mercadoId:mercId,preco:item.preco,obs:'IA lote'});
+        enviados++;
+      }catch(e){
+        erros++;
+        const msg = e.message||'';
+        console.warn('[lote contrib err]',item.produto, msg);
+        // Detecta causa específica e interrompe se for auth/bloqueio
+        if(msg.toLowerCase().includes('bloqueado')||msg.toLowerCase().includes('bloquead')){
+          showToast('Conta bloqueada — envio interrompido.','🔒'); break;
+        }
+        if(msg.toLowerCase().includes('login')||msg.toLowerCase().includes('token')||msg.toLowerCase().includes('autoriza')){
+          showToast('Sessão expirada — faça login novamente.','🔒'); break;
+        }
+        ultimoErroLote = msg;
+      }
+    }else{
+      const nome=(item.produto||'').trim();if(!nome)continue;
+      try{
+        await apiReq('POST','/api/solicitacao-produto',{nome:nome,preco:item.preco||0,mercadoId:mercId,mercadoNome:mercNome,obs:'IA lote - produto nao encontrado no catalogo.',autor:clienteLogado.nome||clienteLogado.login||'cliente'});
+        solicitados++;
+      }catch(e){
+        erros++;
+        ultimoErroLote = e.message||'';
+        console.warn('[lote sol err]',nome, e.message);
+      }
+    }
   }
   document.querySelectorAll('[onclick^="enviarItemMulti"],[onclick^="solicitarNovoProdutoIA"]').forEach(b=>{b.disabled=true;b.textContent='✅ Processado';b.style.background='var(--muted)';});
   const p=[];if(enviados)p.push(enviados+' enviado(s)');if(solicitados)p.push(solicitados+' solicitado(s)');if(erros)p.push(erros+' erro(s)');
-  showToast(p.length?p.join(' · ')+' — obrigado! 🙏':'Nenhum item processado.',p.length?'📸':'⚠️');
+  // Se só houve erros, mostra a causa real
+  const msgFinal = p.length ? p.join(' · ')+' — obrigado! 🙏' : 'Nenhum item processado.';
+  const detalheErro = erros && !enviados && !solicitados && ultimoErroLote ? '\nCausa: '+ultimoErroLote : '';
+  showToast(msgFinal + detalheErro, p.length && enviados ? '📸' : erros ? '❌' : '⚠️');
   } finally { window._enviandoTodosMulti = false; }
 }
 

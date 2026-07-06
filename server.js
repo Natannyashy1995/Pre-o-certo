@@ -2113,10 +2113,28 @@ app.patch('/api/contribuicoes/:id/aprovar', adminAuth, async (req, res) => {
 
 app.patch('/api/contribuicoes/:id/rejeitar', adminAuth, async (req, res) => {
   try {
-    const c = await Contribuicao.findByIdAndUpdate(req.params.id, { status:'rejeitado', motivoRecusa:req.body?.motivo||'' }, { new:true });
+    const motivo = req.body?.motivo || '';
+    const c = await Contribuicao.findByIdAndUpdate(req.params.id, { status:'rejeitado', motivoRecusa:motivo }, { new:true });
     if (!c) return res.status(404).json({ erro:'Não encontrada' });
-    if (c.clienteId) await Cliente.findByIdAndUpdate(c.clienteId, { $inc:{ contribuicoesRejeitadas:1 } });
-    res.json({ mensagem:'Rejeitado' });
+    let bloqueadoAgora = false;
+    if (c.clienteId) {
+      // Incrementa errosConsecutivos no banco
+      const cli = await Cliente.findByIdAndUpdate(
+        c.clienteId,
+        { $inc: { errosConsecutivos: 1, contribuicoesRejeitadas: 1 } },
+        { new: true }
+      );
+      // Bloqueia automaticamente se >= 3 erros consecutivos
+      if (cli && cli.errosConsecutivos >= 3 && !cli.bloqueado) {
+        await Cliente.findByIdAndUpdate(c.clienteId, {
+          bloqueado: true,
+          motivoBloqueio: `Bloqueado automaticamente: ${cli.errosConsecutivos} contribuições rejeitadas consecutivas. Último motivo: ${motivo||'sem motivo'}`,
+          dataBloqueio: new Date().toLocaleDateString('pt-BR'),
+        });
+        bloqueadoAgora = true;
+      }
+    }
+    res.json({ mensagem:'Rejeitado', bloqueadoAgora });
   } catch(e) { res.status(500).json({ erro: e.message }); }
 });
 

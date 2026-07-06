@@ -6356,7 +6356,7 @@ async function enviarTodosMulti(){
         if(msg.toLowerCase().includes('login')||msg.toLowerCase().includes('token')||msg.toLowerCase().includes('autoriza')){
           showToast('Sessão expirada — faça login novamente.','🔒'); break;
         }
-        ultimoErroLote = msg;
+        if(!ultimoErroLote) ultimoErroLote = msg || 'Erro desconhecido';
       }
     }else{
       const nome=(item.produto||'').trim();if(!nome)continue;
@@ -6365,17 +6365,17 @@ async function enviarTodosMulti(){
         solicitados++;
       }catch(e){
         erros++;
-        ultimoErroLote = e.message||'';
+        if(!ultimoErroLote) ultimoErroLote = e.message || 'Erro na solicitação';
         console.warn('[lote sol err]',nome, e.message);
       }
     }
   }
   document.querySelectorAll('[onclick^="enviarItemMulti"],[onclick^="solicitarNovoProdutoIA"]').forEach(b=>{b.disabled=true;b.textContent='✅ Processado';b.style.background='var(--muted)';});
   const p=[];if(enviados)p.push(enviados+' enviado(s)');if(solicitados)p.push(solicitados+' solicitado(s)');if(erros)p.push(erros+' erro(s)');
-  // Se só houve erros, mostra a causa real
-  const msgFinal = p.length ? p.join(' · ')+' — obrigado! 🙏' : 'Nenhum item processado.';
-  const detalheErro = erros && !enviados && !solicitados && ultimoErroLote ? '\nCausa: '+ultimoErroLote : '';
-  showToast(msgFinal + detalheErro, p.length && enviados ? '📸' : erros ? '❌' : '⚠️');
+  const msgFinal = p.length ? p.join(' · ')+(enviados||solicitados?' — obrigado! 🙏':'') : 'Nenhum item processado.';
+  // Sempre mostra causa do erro se houver
+  const detalheErro = erros && ultimoErroLote ? ' | Erro: '+ultimoErroLote.substring(0,80) : '';
+  showToast(msgFinal + detalheErro, enviados||solicitados ? '📸' : erros ? '❌' : '⚠️');
   } finally { window._enviandoTodosMulti = false; }
 }
 

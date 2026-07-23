@@ -432,11 +432,35 @@ app.get('/manifest.json', (req, res) => {
     theme_color: '#1a56db',
     lang: 'pt-BR',
     icons: [
-      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+      { src: '/icons/icon-48.png',           sizes: '48x48',     type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-72.png',           sizes: '72x72',     type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-96.png',           sizes: '96x96',     type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-128.png',          sizes: '128x128',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-144.png',          sizes: '144x144',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-152.png',          sizes: '152x152',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-192.png',          sizes: '192x192',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-384.png',          sizes: '384x384',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png',          sizes: '512x512',   type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-192-maskable.png', sizes: '192x192',   type: 'image/png', purpose: 'maskable' },
+      { src: '/icons/icon-512-maskable.png', sizes: '512x512',   type: 'image/png', purpose: 'maskable' }
     ],
     categories: ['shopping', 'utilities'],
-    screenshots: []
+    screenshots: [
+      {
+        src: '/icons/screenshot-mobile.png',
+        sizes: '390x844',
+        type: 'image/png',
+        form_factor: 'narrow',
+        label: 'Tela inicial do PreçoCerto'
+      },
+      {
+        src: '/icons/screenshot-wide.png',
+        sizes: '1280x800',
+        type: 'image/png',
+        form_factor: 'wide',
+        label: 'PreçoCerto — visão geral'
+      }
+    ]
   });
 });
 

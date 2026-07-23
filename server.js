@@ -421,16 +421,26 @@ app.use((req,res,next)=>{res.setHeader('Cache-Control','no-cache,no-store,must-r
 app.get('/manifest.json', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.json({
+    id: 'com.precocerto.piata',
     name: 'PreçoCerto',
     short_name: 'PreçoCerto',
     description: 'Compare preços na sua cidade',
     start_url: '/',
     scope: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     orientation: 'portrait',
     background_color: '#f0f4ff',
     theme_color: '#1a56db',
     lang: 'pt-BR',
+    prefer_related_applications: false,
+    related_applications: [
+      {
+        platform: 'play',
+        url: 'https://play.google.com/store/apps/details?id=com.precocerto.piata',
+        id: 'com.precocerto.piata'
+      }
+    ],
     icons: [
       { src: '/icons/icon-48.png',           sizes: '48x48',     type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-72.png',           sizes: '72x72',     type: 'image/png', purpose: 'any' },

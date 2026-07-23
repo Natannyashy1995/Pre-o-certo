@@ -463,6 +463,17 @@ const iaLimiter      = rateLimit({ windowMs: 60*1000, max: 20,
 const iaAdminLimiter = rateLimit({ windowMs: 60*1000, max: 300,
   message: { erro: 'Limite admin IA atingido.' }
 });
+// ── PERFIL CLIENTE (verifica se sessão ainda é válida) ──────────────────────
+app.get('/api/perfil-cliente', authMiddleware, async (req, res) => {
+  try {
+    if(req.user.tipo !== 'cliente') return res.status(403).json({ erro:'Acesso negado' });
+    const c = await Cliente.findById(req.user.id).select('-senhaHash');
+    if(!c) return res.status(404).json({ erro:'Conta não encontrada' });
+    if(c.bloqueado) return res.status(403).json({ erro:'Conta bloqueada' });
+    res.json({ ok:true, nome:c.nome, login:c.login, bloqueado:c.bloqueado });
+  } catch(e) { res.status(500).json({ erro: e.message }); }
+});
+
 // ── PING (keep-alive e health check) ────────────────────────────────────────
 app.get('/api/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
 

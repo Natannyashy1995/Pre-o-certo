@@ -447,14 +447,14 @@ app.get('/manifest.json', (req, res) => {
     categories: ['shopping', 'utilities'],
     screenshots: [
       {
-        src: '/icons/screenshot-mobile.png',
+        src: '/screenshot-mobile.png',
         sizes: '390x844',
         type: 'image/png',
         form_factor: 'narrow',
         label: 'Tela inicial do PreçoCerto'
       },
       {
-        src: '/icons/screenshot-wide.png',
+        src: '/screenshot-wide.png',
         sizes: '1280x800',
         type: 'image/png',
         form_factor: 'wide',

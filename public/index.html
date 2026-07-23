@@ -1265,6 +1265,9 @@ var API_URL = window.location.hostname === 'localhost' || window.location.hostna
 let apiToken = null;
 let modoOffline = false; // true se backend não responder
 
+// Flag para evitar loop de relogin
+let _sessaoExpiradaAlertada = false;
+
 async function apiReq(method, path, body=null, auth=true){
   try {
     const headers = { 'Content-Type':'application/json' };
@@ -1294,7 +1297,21 @@ async function apiReq(method, path, body=null, auth=true){
     try { data = JSON.parse(text); } catch(e) {
       throw new Error('Resposta inválida do servidor');
     }
-    if(!res.ok) throw new Error(data.erro || 'Erro na API');
+    if(!res.ok){
+      // Token expirado — limpar sessão e redirecionar para login automaticamente
+      if(res.status === 401 && !_sessaoExpiradaAlertada){
+        _sessaoExpiradaAlertada = true;
+        limparSessaoLembrada();
+        limparToken();
+        clienteLogado = null;
+        setTimeout(()=>{
+          _sessaoExpiradaAlertada = false;
+          showToast('Sessão expirada. Faça login novamente.','🔒');
+          irPara('login');
+        }, 300);
+      }
+      throw new Error(data.erro || 'Erro na API ('+res.status+')');
+    }
     modoOffline = false;
     return data;
   } catch(e) {
@@ -6348,15 +6365,15 @@ async function enviarTodosMulti(){
       }catch(e){
         erros++;
         const msg = e.message||'';
+        const prodNome = (item.produto||'').substring(0,30);
         console.warn('[lote contrib err]',item.produto, msg);
-        // Detecta causa específica e interrompe se for auth/bloqueio
         if(msg.toLowerCase().includes('bloqueado')||msg.toLowerCase().includes('bloquead')){
           showToast('Conta bloqueada — envio interrompido.','🔒'); break;
         }
         if(msg.toLowerCase().includes('login')||msg.toLowerCase().includes('token')||msg.toLowerCase().includes('autoriza')){
           showToast('Sessão expirada — faça login novamente.','🔒'); break;
         }
-        if(!ultimoErroLote) ultimoErroLote = msg || 'Erro desconhecido';
+        if(!ultimoErroLote) ultimoErroLote = '['+prodNome+']: '+(msg||'Erro desconhecido');
       }
     }else{
       const nome=(item.produto||'').trim();if(!nome)continue;
@@ -6365,7 +6382,7 @@ async function enviarTodosMulti(){
         solicitados++;
       }catch(e){
         erros++;
-        if(!ultimoErroLote) ultimoErroLote = e.message || 'Erro na solicitação';
+        if(!ultimoErroLote) ultimoErroLote = '['+(item.produto||'').substring(0,25)+']: '+(e.message||'Erro na solicitação');
         console.warn('[lote sol err]',nome, e.message);
       }
     }
@@ -11885,6 +11902,21 @@ async function inicializarApp(){
       carregarPropagandaBanner();
       irPara('home');
       renderHome();
+      // Verifica token em background — se expirou, redireciona para login
+      setTimeout(async ()=>{
+        try {
+          await apiReq('GET', '/api/perfil-cliente', null, true);
+        } catch(e){
+          // 401 já foi tratado no apiReq — limpa e redireciona
+          if(e.message && (e.message.includes('expirada')||e.message.includes('401')||e.message.includes('Token'))){
+            limparSessaoLembrada();
+            limparToken();
+            clienteLogado = null;
+            showToast('Sessão expirada. Faça login novamente.','🔒');
+            irPara('login');
+          }
+        }
+      }, 1500);
       return; // Não passa pela tela de login
     } catch(e){
       limparSessaoLembrada();

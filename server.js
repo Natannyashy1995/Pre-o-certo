@@ -520,7 +520,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
     "target": {
       "namespace": "android_app",
       "package_name": "com.precocerto.piata",
-      "sha256_cert_fingerprints": ["3D:F8:D6:3F:4D:43:B2:42:5F:E6:49:15:2C:7A:EC:24:64:2C:F3:C7:6E:C3:26:B0:33:36:05:EE:A3:D7:69:3F"]
+      "sha256_cert_fingerprints": ["45:73:7F:78:7F:C9:B9:7C:F8:0F:D9:B2:44:01:D8:10:7B:DA:CA:40:A5:F6:69:77:BB:BF:4F:8B:0E:8A:26:BD"]
     }
   }]);
 });

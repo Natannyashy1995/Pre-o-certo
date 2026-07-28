@@ -4840,6 +4840,8 @@ function renderContrib(){
 
       <div style="background:var(--card2);border:1.5px solid var(--azul);border-radius:12px;padding:12px;">
         <div style="font-size:11px;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📍 Mercado (obrigatório)</div>
+        <input type="text" id="buscaMercadoFoto" placeholder="🔍 Buscar mercado..." class="input-field"
+          style="margin-bottom:4px;" oninput="filtrarSelectMercado('fotoMercadoAntes','buscaMercadoFoto')" autocomplete="off">
         <select class="input-field" id="fotoMercadoAntes" style="margin:0;" onchange="syncMercadoFoto(this.value)">
           <option value="">⚠️ Selecione o mercado antes de tirar a foto</option>
           ${db.mercados.map(m=>`<option value="${m._id||m.id}">${m.icone} ${m.nome}</option>`).join('')}

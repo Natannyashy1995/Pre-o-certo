@@ -4314,6 +4314,21 @@ function renderBusca(){
   filtrarProdutos();atualizarBadges();
 }
 function toggleBairroFilter(){filtroAberto=!filtroAberto;document.getElementById('bairroDD').classList.toggle('show',filtroAberto);document.getElementById('filterBtn').classList.toggle('ativo',filtroAberto);}
+function filtrarSelectMercado(selectId, inputId){
+  const q = (document.getElementById(inputId)?.value||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  Array.from(sel.options).forEach(opt => {
+    if(!opt.value){ opt.style.display=''; return; } // placeholder
+    const txt = opt.text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    opt.style.display = (!q || txt.includes(q)) ? '' : 'none';
+  });
+  // Se só tem uma opção visível, seleciona automaticamente
+  const visiveis = Array.from(sel.options).filter(o=>o.value&&o.style.display!=='none');
+  if(visiveis.length===1){ sel.value=visiveis[0].value; sel.dispatchEvent(new Event('change')); }
+}
+
 function filtrarBairro(b){bairroAtivo=b;document.querySelectorAll('#bairroChips .chip').forEach(ch=>ch.classList.toggle('ativo',ch.textContent===b));filtrarProdutos();}
 
 // ── SELETOR DE CIDADE ─────────────────────────────────────────────────────
@@ -4585,20 +4600,29 @@ function filtrarProdutos(){
   if(categoriaAtiva!=='Todos')prods=prods.filter(p=>p.categoria===categoriaAtiva);
   if(busca){
     const palavrasBusca = busca.split(/\s+/).filter(w=>w.length>0);
+    // Verifica se a palavra está no nome como palavra inteira ou início de palavra
+    // Ex: "ovo" NÃO casa com "NOVO", mas casa com "Ovos", "Ovo Caipira"
+    const matchPalavra = (nomeNorm, w) => {
+      // Início do nome, após espaço, ou após hífen — nunca no meio de outra palavra
+      const re = new RegExp('(^|[\\s\\-\\/])' + w.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&'), 'i');
+      return re.test(nomeNorm);
+    };
     prods=prods.filter(p=>{
       const nomeNorm = norm(p.nome);
-      // Todas as palavras da busca devem estar contidas no nome do produto
-      return palavrasBusca.every(w => nomeNorm.includes(w));
+      return palavrasBusca.every(w => matchPalavra(nomeNorm, w));
     });
-    // Se não achou resultado exato, busca parcial (pelo menos 1 palavra)
-    if(!prods.length && palavrasBusca.length > 1){
+    // Fallback: se não achou, tenta substring normal (busca ampla)
+    if(!prods.length){
       const prodsAll = categoriaAtiva!=='Todos'
         ? db.produtos.filter(p=>p.categoria===categoriaAtiva)
         : db.produtos;
       prods = prodsAll.filter(p=>{
         const nomeNorm = norm(p.nome);
-        const hits = palavrasBusca.filter(w => nomeNorm.includes(w));
-        return hits.length >= 1;
+        return palavrasBusca.every(w => nomeNorm.includes(w));
+      }).filter(p => {
+        // Excluir se a palavra busca está apenas no meio de outra (ex: "ovo" em "NOVO")
+        const nomeNorm = norm(p.nome);
+        return palavrasBusca.some(w => matchPalavra(nomeNorm, w));
       });
     }
   }
@@ -4816,6 +4840,8 @@ function renderContrib(){
 
       <div style="background:var(--card2);border:1.5px solid var(--azul);border-radius:12px;padding:12px;">
         <div style="font-size:11px;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📍 Mercado (obrigatório)</div>
+        <input type="text" id="buscaMercadoFoto" placeholder="🔍 Buscar mercado..." class="input-field"
+          style="margin-bottom:4px;" oninput="filtrarSelectMercado('fotoMercadoAntes','buscaMercadoFoto')" autocomplete="off">
         <select class="input-field" id="fotoMercadoAntes" style="margin:0;" onchange="syncMercadoFoto(this.value)">
           <option value="">⚠️ Selecione o mercado antes de tirar a foto</option>
           ${db.mercados.map(m=>`<option value="${m._id||m.id}">${m.icone} ${m.nome}</option>`).join('')}
@@ -7591,6 +7617,7 @@ function renderAdminForm(){
       <!-- SELETOR DE MERCADO — fixo no topo para todos os itens da foto -->
       <div style="background:#fff;border:2px solid var(--azul);border-radius:13px;padding:12px;">
         <div class="field-label" style="color:var(--azul);font-weight:800;margin-bottom:6px;">🏪 Mercado desta foto <span style="color:var(--vermelho);">*</span></div>
+        <input type="text" id="buscaAdminMercFoto" placeholder="🔍 Buscar mercado..." style="width:100%;border:1.5px solid var(--borda);border-radius:10px;padding:10px;font-size:13px;font-family:var(--font-body);box-sizing:border-box;margin-bottom:4px;" oninput="filtrarSelectMercado('adminFotoMercado','buscaAdminMercFoto')" autocomplete="off">
         <select id="adminFotoMercado" style="width:100%;border:1.5px solid var(--borda);border-radius:10px;padding:10px;font-size:13px;font-family:var(--font-body);" onchange="window._adminFotoMercFinal=this.value;localStorage.setItem('_adminFotoMercFinal',this.value);">
           <option value="">— Selecione o mercado antes de tirar a foto —</option>
           ${(()=>{const saved=window._adminFotoMercFinal||localStorage.getItem('_adminFotoMercFinal')||'';return db.mercados.map(m=>'<option value="'+(m._id||m.id)+'"'+(String(m._id||m.id)===saved?' selected':'')+'>'+( m.icone||'🏪')+' '+m.nome+'</option>').join('');})()}

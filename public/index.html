@@ -5708,8 +5708,14 @@ async function processarFotoMultiplas(e){
   document.getElementById('uploadAreaFoto').style.display = 'none';
   const aiBox = document.getElementById('aiBox');
   aiBox.classList.add('show');
+  aiBox.style.position = 'relative';
+  aiBox.style.zIndex = '10';
   document.getElementById('aiLoading').style.display = 'flex';
+  document.getElementById('aiLoading').style.position = 'relative';
+  document.getElementById('aiLoading').style.zIndex = '10';
   document.getElementById('aiResultado').style.display = 'none';
+  // Scroll para mostrar o loading ao usuário
+  setTimeout(()=>{ aiBox.scrollIntoView({behavior:'smooth', block:'center'}); }, 200);
 
   const mercadosList = db.mercados.map(m=>`${m.icone||'🏪'} ${m.nome}`).join(', ') || 'nenhum';
 
@@ -5962,8 +5968,12 @@ function resetarFotoIA(){
 function montarPromptFotoIA(nFotos, mercadosList){
   const multi = nFotos > 1;
   const cabecalho = multi
-    ? `Você recebeu ${nFotos} foto(s) numeradas de preços de supermercado.
-REGRA: Analise cada foto de forma INDEPENDENTE, da foto 1 até a foto ${nFotos}. Não pule nem agrupe fotos. Registre o número da foto no campo "f".`
+    ? `Você recebeu ${nFotos} fotos numeradas de etiquetas de preço de supermercado/hortifruti.
+REGRA CRÍTICA: Cada foto contém UMA etiqueta com UM produto. Analise CADA foto independentemente.
+- Foto 1 = produto 1, Foto 2 = produto 2, etc.
+- NUNCA retorne lista vazia se as fotos tiverem texto legível
+- Se a foto mostrar nome e preço, SEMPRE extraia, mesmo que parcialmente legível
+- Registre o número da foto no campo "f"`
     : `Você é especialista em leitura de preços de supermercados brasileiros. Analise a imagem e extraia TODOS os produtos visíveis.`;
 
   const rodape = multi
@@ -6001,8 +6011,11 @@ TIPO 4 — LISTA DE PREÇOS em quadro/banner (linhas com "........"):
   - "R" cortado pelo quadrado = número visível É o preço
   - Marcas comuns: Sadia, Seara, Pif Paf, Mauricéia, Frango de Ouro, Avigran, Maturata
 
-TIPO 5 — ETIQUETA SIMPLES de prateleira ou embalagem:
-  - Leia marca, nome, tamanho e preço
+TIPO 5 — ETIQUETA SIMPLES de prateleira ou embalagem (inclui HORT, hortifruti):
+  - Leia o nome do produto e o preço exibido
+  - Etiquetas com "HORT" = hortifruti, preço é por kg
+  - Nome como aparece na etiqueta, adicione "kg" se for hortifruti
+  - Exemplo: "CEBOLA ROXA MIUDA" R$ 4.26 → nome="Cebola Roxa Miúda kg", preco=4.26
 
 REGRA CRÍTICA: Múltiplas etiquetas ou prateleiras → extraia UM item por etiqueta. Não ignore nenhuma.
 Mercados cadastrados: ${mercadosList || 'nenhum'}

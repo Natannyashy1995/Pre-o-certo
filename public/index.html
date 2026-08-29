@@ -5720,44 +5720,56 @@ async function processarFotoMultiplas(e){
   const mercadosList = db.mercados.map(m=>`${m.icone||'🏪'} ${m.nome}`).join(', ') || 'nenhum';
 
   try {
-    // 1 chamada só com todas as fotos — Gemini aceita múltiplas imagens numa request
+    // Processa cada foto individualmente para maior confiabilidade
+    // (Gemini pode falhar com muitas imagens numa só chamada)
     const loadEl = document.getElementById('aiLoading');
-    if(loadEl) loadEl.querySelector('span').textContent = `Analisando ${dataUrls.length} foto(s)...`;
+    const promptSingle = montarPromptFotoIA(1, mercadosList);
 
-    // Monta array de imagens para o endpoint do servidor
-    const imagensPayload = dataUrls.map(u => ({
-      base64: u.split(',')[1],
-      mediaType: 'image/jpeg'
-    }));
-
-    const promptMulti = montarPromptFotoIA(dataUrls.length, mercadosList);
-
-    // Envia para servidor que repassa ao Gemini com todas as imagens
-    const respMulti = await fetch(API_URL + '/api/ia/analisar-multi', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt: promptMulti, imagens: imagensPayload })
-    });
-    const rawMulti = await respMulti.text();
-    let textoMulti = '';
-    try { textoMulti = JSON.parse(rawMulti).texto || ''; } catch{}
-
-    let resultado = null;
-    try {
-      const clean = textoMulti.replace(/```json|```/g,'').trim();
-      try { resultado = JSON.parse(clean); }
-      catch { const m2 = textoMulti.match(/\{[\s\S]*\}/); if(m2) resultado = JSON.parse(m2[0]); }
-    } catch(ep) { resultado = null; }
-
-    let mercadoDetectado = resultado ? (resultado.m || resultado.mercado || null) : null;
     let todosItens = [];
-    if(resultado){
-      const itens = resultado.i || resultado.itens || [];
-      itens.forEach(it => {
-        const prod = it.p || it.produto || '';
-        const val = parseFloat(it.v || it.preco || 0);
-        if(prod && val > 0) todosItens.push({produto: prod, preco: val, confianca: it.c || it.confianca || 'alta'});
-      });
+    let mercadoDetectado = null;
+
+    for(let i = 0; i < dataUrls.length; i++){
+      if(loadEl) {
+        const spanEl = loadEl.querySelector('span');
+        if(spanEl) spanEl.textContent = `Analisando foto ${i+1} de ${dataUrls.length}...`;
+      }
+      // Destaca a foto atual no carrossel
+      if(typeof irSlide === 'function') irSlide(i);
+
+      try {
+        const resp = await fetch(API_URL + '/api/ia/analisar-multi', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            prompt: promptSingle,
+            imagens: [{ base64: dataUrls[i].split(',')[1], mediaType: 'image/jpeg' }]
+          })
+        });
+        const raw = await resp.text();
+        let texto = '';
+        try { texto = JSON.parse(raw).texto || ''; } catch{}
+
+        let resultado = null;
+        try {
+          const clean = texto.replace(/```json|```/g,'').trim();
+          try { resultado = JSON.parse(clean); }
+          catch { const m2 = texto.match(/\{[\s\S]*\}/); if(m2) resultado = JSON.parse(m2[0]); }
+        } catch{}
+
+        if(resultado){
+          if(!mercadoDetectado && (resultado.m || resultado.mercado))
+            mercadoDetectado = resultado.m || resultado.mercado;
+          const itens = resultado.i || resultado.itens || [];
+          itens.forEach(it => {
+            const prod = it.p || it.produto || '';
+            const val = parseFloat(it.v || it.preco || 0);
+            if(prod && val > 0)
+              todosItens.push({produto: prod, preco: val, confianca: it.c || it.confianca || 'alta'});
+          });
+        }
+      } catch(eFoto){
+        console.warn(`[multi] erro foto ${i+1}:`, eFoto.message);
+      }
     }
 
     // ── Correção automática preço/kg para etiquetas de balança ───────────────

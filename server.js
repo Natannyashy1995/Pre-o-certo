@@ -480,7 +480,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
       res.setHeader('Cache-Control', 'public, max-age=86400');
     if (filePath.endsWith('manifest.json'))
       res.setHeader('Content-Type', 'application/manifest+json');
-    if (filePath.includes('service-worker'))
+    if (filePath.includes('service-worker') || filePath.endsWith('index.html'))
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
 }));
@@ -3122,6 +3122,10 @@ app.all('/api/{*path}', (req, res) => {
 });
 
 app.get('/{*path}', (req, res) => {
+  // Nunca cachear o index.html — garante que o SW sempre pega a versão mais recente
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
